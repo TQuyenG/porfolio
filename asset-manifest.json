@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/TQuyenG/porfolio/static/css/main.6dfb464e.css",
+    "main.js": "/TQuyenG/porfolio/static/js/main.82ad3a6e.js",
+    "index.html": "/TQuyenG/porfolio/index.html",
+    "main.6dfb464e.css.map": "/TQuyenG/porfolio/static/css/main.6dfb464e.css.map",
+    "main.82ad3a6e.js.map": "/TQuyenG/porfolio/static/js/main.82ad3a6e.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.6dfb464e.css",
+    "static/js/main.82ad3a6e.js"
+  ]
+}
