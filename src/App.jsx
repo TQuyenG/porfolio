@@ -5,9 +5,10 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import About from './pages/About';
 import Projects from './pages/Projects';
-import Resume from './pages/Resume';
+import ProjectDetail from './pages/ProjectDetail';
 import Blog from './pages/Blog';
-import Library from './pages/Library';
+import BlogPostDetail from './pages/BlogPostDetail'; // Thêm trang chi tiết Blog
+import Resume from './pages/Resume';
 import Private from './pages/Private';
 import Contact from './pages/Contact';
 import './styles/App.css';
@@ -22,9 +23,10 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/projects" element={<Projects />} />
-            <Route path="/resume" element={<Resume />} />
+            <Route path="/projects/:slug" element={<ProjectDetail />} />
             <Route path="/blog" element={<Blog />} />
-            <Route path="/library" element={<Library />} />
+            <Route path="/blog/:slug" element={<BlogPostDetail />} /> {/* Route cho bài viết */}
+            <Route path="/resume" element={<Resume />} />
             <Route path="/admin" element={<Private />} />
             <Route path="/contact" element={<Contact />} />
           </Routes>
