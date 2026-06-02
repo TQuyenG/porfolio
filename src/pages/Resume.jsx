@@ -1,7 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import '../styles/pages.css';
+import { getPageContent } from '../utils/supabaseClient';
 
 function Resume() {
+  const [content, setContent] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const c = await getPageContent('resume');
+      if (mounted) setContent(c);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const header = content?.header || { name: 'QUYEN - Web Developer', contact: 'Email: your.email@example.com | Phone: +84 xxx xxx xxx', location: 'Your City, Vietnam' };
+  const overview = content?.overview || 'Web developer có kinh nghiệm trong phát triển ứng dụng web hiện đại với React, Node.js và các công nghệ backend khác.';
+  const experiences = content?.experiences || [{ title: 'Web Developer', date: '2022 - Hiện tại', company: 'Công ty ABC', bullets: ['Phát triển và bảo trì các ứng dụng web với React', 'Tối ưu hóa performance và SEO', 'Làm việc với API RESTful'] }];
+  const skills = content?.skills || [{ title: 'Frontend', items: ['React', 'JavaScript', 'HTML', 'CSS', 'Responsive Design'] }, { title: 'Backend', items: ['Node.js', 'Express', 'Python', 'SQL'] }];
+  const education = content?.education || [{ title: 'Cử nhân Công nghệ Thông tin', date: '2018 - 2022', company: 'Đại học XYZ' }];
+  const cvUrl = content?.cvUrl || '/documents/CV-Quyen.pdf';
+
   return (
     <section className="page resume-page">
       <div className="page-header">
@@ -11,74 +30,64 @@ function Resume() {
 
       <div className="resume-container">
         <div className="resume-header">
-          <h2>QUYEN - Web Developer</h2>
-          <p>Email: your.email@example.com | Phone: +84 xxx xxx xxx</p>
-          <p>Location: Your City, Vietnam</p>
+          <h2>{header.name}</h2>
+          <p>{header.contact}</p>
+          <p>{header.location}</p>
         </div>
 
         <section className="resume-section">
-          <h3>TÓNG QUAN</h3>
-          <p>
-            Web developer có kinh nghiệm trong phát triển ứng dụng web hiện đại 
-            với React, Node.js và các công nghệ backend khác.
-          </p>
+          <h3>TỔNG QUAN</h3>
+          <p>{overview}</p>
         </section>
 
         <section className="resume-section">
-          <h3>KINH NGHIỆM LÀNG VIỆC</h3>
-          <div className="resume-item">
-            <div className="resume-header-item">
-              <h4>Web Developer</h4>
-              <span className="date">2022 - Hiện tại</span>
+          <h3>KINH NGHIỆM</h3>
+          {experiences.map((exp, idx) => (
+            <div className="resume-item" key={idx}>
+              <div className="resume-header-item">
+                <h4>{exp.title}</h4>
+                <span className="date">{exp.date}</span>
+              </div>
+              <p className="company">{exp.company}</p>
+              <ul>
+                {(exp.bullets || []).map((b, i) => <li key={i}>{b}</li>)}
+              </ul>
             </div>
-            <p className="company">Công ty ABC</p>
-            <ul>
-              <li>Phát triển và bảo trì các ứng dụng web với React</li>
-              <li>Tối ưu hóa performance và SEO</li>
-              <li>Làm việc với API RESTful</li>
-            </ul>
-          </div>
+          ))}
         </section>
 
         <section className="resume-section">
           <h3>KỸ NĂNG</h3>
           <div className="skills-list">
-            <div>
-              <strong>Frontend:</strong> React, JavaScript, HTML, CSS, Responsive Design
-            </div>
-            <div>
-              <strong>Backend:</strong> Node.js, Express, Python, SQL
-            </div>
-            <div>
-              <strong>Tools:</strong> Git, Docker, AWS, VS Code
-            </div>
+            {skills.map((s, i) => (
+              <div key={i}><strong>{s.title}:</strong> {s.items.join(', ')}</div>
+            ))}
           </div>
         </section>
 
         <section className="resume-section">
           <h3>HỌC VẤN</h3>
-          <div className="resume-item">
-            <div className="resume-header-item">
-              <h4>Cử nhân Công nghệ Thông tin</h4>
-              <span className="date">2018 - 2022</span>
+          {education.map((ed, i) => (
+            <div className="resume-item" key={i}>
+              <div className="resume-header-item">
+                <h4>{ed.title}</h4>
+                <span className="date">{ed.date}</span>
+              </div>
+              <p className="company">{ed.company}</p>
             </div>
-            <p className="company">Đại học XYZ</p>
-          </div>
+          ))}
         </section>
 
         <section className="resume-section">
           <h3>CHỨNG CHỈ & GIẢI THƯỞNG</h3>
           <ul>
-            <li>React Advanced - Certificate (2023)</li>
-            <li>Full Stack Web Developer - Bootcamp (2022)</li>
+            {(content?.awards || ['React Advanced - Certificate (2023)', 'Full Stack Web Developer - Bootcamp (2022)']).map((a, i) => <li key={i}>{a}</li>)}
           </ul>
         </section>
 
         <div className="resume-actions">
-          <a href="/documents/CV-Quyen.pdf" download className="btn btn-primary">
-            📥 Tải CV (PDF)
-          </a>
-          <p className="note">💡 Lưu ý: Đặt file CV của bạn vào <code>public/documents/</code></p>
+          <a href={cvUrl} download className="btn btn-primary">Tải CV (PDF)</a>
+          <p className="note">✔ CV có sẵn để tải về. Liên hệ nếu cần phiên bản chi tiết hơn.</p>
         </div>
       </div>
     </section>

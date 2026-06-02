@@ -1,9 +1,33 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/Navigation.css';
+import { supabase } from '../utils/supabaseClient';
 
 function Navigation() {
   const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(()=>{
+    let mounted = true;
+    const check = async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
+      const adminEmail = process.env.REACT_APP_ADMIN_EMAIL || '';
+      if (session?.user && (!adminEmail || session.user.email === adminEmail)) {
+        if (mounted) setIsAdmin(true);
+      } else {
+        if (mounted) setIsAdmin(false);
+      }
+    };
+    check();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session)=>{
+      const adminEmail = process.env.REACT_APP_ADMIN_EMAIL || '';
+      if (session?.user && (!adminEmail || session.user.email === adminEmail)) setIsAdmin(true);
+      else setIsAdmin(false);
+    });
+    return ()=> listener.subscription.unsubscribe();
+  }, []);
 
   return (
     <nav className="navbar">
@@ -45,11 +69,13 @@ function Navigation() {
               Thư Viện
             </Link>
           </li>
-          <li className="nav-item">
-            <Link to="/private" className="nav-link" onClick={() => setMenuOpen(false)}>
-              Riêng Tư
-            </Link>
-          </li>
+          {isAdmin && (
+            <li className="nav-item">
+              <Link to="/admin" className="nav-link" onClick={() => setMenuOpen(false)}>
+                Admin
+              </Link>
+            </li>
+          )}
           <li className="nav-item">
             <Link to="/contact" className="nav-link" onClick={() => setMenuOpen(false)}>
               Liên Lạc

@@ -1,33 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getBlogPosts } from '../utils/supabaseClient';
+import { blogPostsData } from '../data/blog-posts';
 import '../styles/pages.css';
 
 function Blog() {
-  const [posts] = useState([
-    {
-      id: 1,
-      title: 'Bài viết 1: Làm quen với React Hooks',
-      date: '2024-01-15',
-      excerpt: 'Tìm hiểu về useState, useEffect và những hooks hữu ích khác...',
-      content: 'Nội dung bài viết đầy đủ ở đây...',
-      category: 'React',
-    },
-    {
-      id: 2,
-      title: 'Bài viết 2: Best Practices cho Node.js',
-      date: '2024-01-10',
-      excerpt: 'Những thực hành tốt nhất khi phát triển server Node.js...',
-      content: 'Nội dung bài viết đầy đủ ở đây...',
-      category: 'Backend',
-    },
-    {
-      id: 3,
-      title: 'Bài viết 3: CSS Grid vs Flexbox',
-      date: '2024-01-05',
-      excerpt: 'So sánh hai phương pháp layout phổ biến nhất...',
-      content: 'Nội dung bài viết đầy đủ ở đây...',
-      category: 'CSS',
-    },
-  ]);
+  const [posts, setPosts] = useState(blogPostsData);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const supabasePosts = await getBlogPosts();
+        if (supabasePosts && supabasePosts.length > 0) {
+          setPosts(supabasePosts);
+        } else {
+          // Nếu database trống, dùng mock data
+          setPosts(blogPostsData);
+        }
+      } catch (err) {
+        console.error('Error fetching blog posts:', err);
+        // Fallback to mock data
+        setPosts(blogPostsData);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="page blog-page">
+        <div className="page-header">
+          <h1>Blog</h1>
+          <p className="subtitle">Đang tải bài viết...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="page blog-page">
+        <div className="page-header">
+          <h1>Blog</h1>
+          <p className="subtitle" style={{ color: 'var(--error)' }}>{error}</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page blog-page">
@@ -55,15 +78,20 @@ function Blog() {
       </div>
 
       <section className="blog-guide">
-        <h2>Cách Viết Bài Blog</h2>
+        <h2>📝 Cách Thêm Bài Blog</h2>
         <p>
-          Bạn có thể thêm bài viết mới bằng cách:
+          Bạn có 2 cách thêm bài viết:
         </p>
         <ol>
-          <li>Tạo file markdown trong <code>public/blog/</code></li>
-          <li>Hoặc chỉnh sửa mảng <code>posts</code> trong <code>src/pages/Blog.jsx</code></li>
-          <li>Thêm ảnh/thumbnail vào <code>public/images/blog/</code></li>
-          <li>Restart server</li>
+          <li><strong>Cách 1 (Nhanh):</strong> Chỉnh sửa <code>src/data/blog-posts.js</code></li>
+          <li><strong>Cách 2 (Database):</strong> Thêm trực tiếp vào Supabase Dashboard:
+            <ul>
+              <li>Vào <strong>Table Editor</strong> → <strong>blog_posts</strong></li>
+              <li>Click <strong>Insert row</strong></li>
+              <li>Điền: title, slug, excerpt, content, category</li>
+              <li>Bài viết sẽ hiển thị tự động!</li>
+            </ul>
+          </li>
         </ol>
       </section>
     </section>

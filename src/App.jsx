@@ -14,7 +14,7 @@ import './styles/App.css';
 
 function App() {
   return (
-    <Router basename={process.env.PUBLIC_URL}>
+    <Router>
       <div className="app">
         <Navigation />
         <main className="main-content">
@@ -25,7 +25,7 @@ function App() {
             <Route path="/resume" element={<Resume />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/library" element={<Library />} />
-            <Route path="/private" element={<Private />} />
+            <Route path="/admin" element={<Private />} />
             <Route path="/contact" element={<Contact />} />
           </Routes>
         </main>

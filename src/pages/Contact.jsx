@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { insertContactMessage } from '../utils/supabaseClient';
 import '../styles/pages.css';
 
 function Contact() {
@@ -10,6 +11,8 @@ function Contact() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -17,18 +20,35 @@ function Contact() {
       ...prev,
       [name]: value,
     }));
+    setError(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Hiện tại chỉ hiển thị thông báo. Bạn có thể connect với backend hoặc email service
-    console.log('Form submitted:', formData);
-    alert('✅ Cảm ơn! Tôi sẽ liên hệ lại với bạn sớm.\n(💡 Hiện tại demo, bạn cần setup email service)');
-    setSubmitted(true);
-    setTimeout(() => {
-      setFormData({ name: '', email: '', subject: '', message: '' });
-      setSubmitted(false);
-    }, 2000);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: supabaseError } = await insertContactMessage(formData);
+
+      if (supabaseError) {
+        setError('❌ Lỗi khi gửi tin nhắn. Vui lòng thử lại.');
+        console.error('Supabase error:', supabaseError);
+      } else {
+        console.log('Message sent successfully:', data);
+        alert('✅ Cảm ơn! Tin nhắn của bạn đã được gửi. Tôi sẽ liên hệ lại với bạn sớm.');
+        setSubmitted(true);
+        setFormData({ name: '', email: '', subject: '', message: '' });
+        setTimeout(() => {
+          setSubmitted(false);
+        }, 2000);
+      }
+    } catch (err) {
+      setError('❌ Lỗi khi gửi tin nhắn: ' + err.message);
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -139,16 +159,17 @@ function Contact() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={submitted}>
-            {submitted ? '✅ Đã Gửi!' : '📤 Gửi Tin Nhắn'}
+          {error && <p style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>}
+          <button type="submit" className="btn btn-primary" disabled={loading || submitted}>
+            {loading ? '⏳ Đang gửi...' : submitted ? '✅ Đã Gửi!' : '📤 Gửi Tin Nhắn'}
           </button>
         </form>
       </div>
 
       <div className="contact-note">
         <p>
-          💡 <strong>Lưu ý:</strong> Hiện tại form này chỉ demo. Để nhận email thực sự, 
-          bạn cần setup <strong>EmailJS</strong>, <strong>Formspree</strong>, hoặc backend server.
+          ✅ <strong>Lưu ý:</strong> Tin nhắn của bạn sẽ được lưu vào Supabase database.
+          Để nhận email notification, vui lòng setup <strong>SendGrid</strong> hoặc <strong>Resend</strong>.
         </p>
       </div>
     </section>

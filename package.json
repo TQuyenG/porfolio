@@ -4,18 +4,26 @@
   "private": true,
   "homepage": "https://yourusername.github.io/portfolio",
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "axios": "^1.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.0",
-    "axios": "^1.3.0"
+    "react-icons": "^4.10.1"
   },
   "devDependencies": {
+    "gh-pages": "^5.0.0",
     "react-scripts": "5.0.1",
-    "gh-pages": "^5.0.0"
+    "pg": "^8.10.0"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "create-db": "node ./scripts/create-db.js",
+    "seed": "node ./scripts/seed-sample.js",
+    "seed-service": "node ./scripts/seed-service.js",
+    "create-bucket": "node ./scripts/create-bucket.js",
+    "signed-url": "node ./scripts/create-signed-url.js",
     "deploy": "npm run build && gh-pages -d build",
     "eject": "react-scripts eject"
   },
