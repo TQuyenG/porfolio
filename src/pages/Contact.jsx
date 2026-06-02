@@ -1,51 +1,55 @@
-import React, { useState } from 'react';
-import { insertContactMessage } from '../utils/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { insertContactMessage, getPageContent } from '../utils/supabaseClient';
 import '../styles/pages.css';
+import NotificationModal from '../components/NotificationModal';
 
 function Contact() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
-  });
-
-  const [submitted, setSubmitted] = useState(false);
+  const [globalContent, setGlobalContent] = useState(null);
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  
+  // Trạng thái điều khiển Modal thông báo thay thế alert
+  const [modal, setModal] = useState({ open: false, type: 'success', title: '', message: '' });
+
+  useEffect(() => {
+    (async () => {
+      const data = await getPageContent('global');
+      if (data) setGlobalContent(data);
+    })();
+  }, []);
+
+  const emailInfo = globalContent?.email || 'quyen.contact@example.com';
+  const phoneInfo = globalContent?.phone || '+84 901 234 567';
+  const addressInfo = globalContent?.address || 'TP. Hồ Chí Minh, Việt Nam';
+  const socialLinks = globalContent?.social || { github: 'https://github.com/TQuyenG', linkedin: 'https://linkedin.com' };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setError(null);
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
-      const { data, error: supabaseError } = await insertContactMessage(formData);
-
+      const { error: supabaseError } = await insertContactMessage(formData);
       if (supabaseError) {
-        setError('❌ Lỗi khi gửi tin nhắn. Vui lòng thử lại.');
-        console.error('Supabase error:', supabaseError);
+        setModal({
+          open: true, type: 'error',
+          title: 'Gửi tin nhắn lỗi',
+          message: 'Hệ thống kết nối cơ sở dữ liệu gặp gián đoạn. Vui lòng thử lại sau.'
+        });
       } else {
-        console.log('Message sent successfully:', data);
-        alert('✅ Cảm ơn! Tin nhắn của bạn đã được gửi. Tôi sẽ liên hệ lại với bạn sớm.');
-        setSubmitted(true);
+        setModal({
+          open: true, type: 'success',
+          title: 'Gửi tin nhắn thành công',
+          message: 'Thông tin của bạn đã được lưu lại trong hệ thống. Tôi sẽ phản hồi sớm nhất qua email.'
+        });
         setFormData({ name: '', email: '', subject: '', message: '' });
-        setTimeout(() => {
-          setSubmitted(false);
-        }, 2000);
       }
     } catch (err) {
-      setError('❌ Lỗi khi gửi tin nhắn: ' + err.message);
-      console.error('Error:', err);
+      setModal({ open: true, type: 'error', title: 'Lỗi không xác định', message: err.message });
     } finally {
       setLoading(false);
     }
@@ -54,124 +58,80 @@ function Contact() {
   return (
     <section className="page contact-page">
       <div className="page-header">
-        <h1>Liên Lạc</h1>
-        <p className="subtitle">Gửi tin nhắn cho tôi</p>
+        <h1>Liên Hệ Trực Tiếp</h1>
+        <p className="subtitle">Để lại thông tin kết nối công việc hoặc dự án hợp tác</p>
       </div>
 
-      <div className="contact-container">
-        <div className="contact-info">
-          <h2>Thông Tin Liên Lạc</h2>
-          <div className="info-items">
+      <div className="contact-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '3rem' }}>
+        <div className="contact-info" style={{ backgroundColor: '#ffffff', padding: '2.5rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.01)' }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: '#111827' }}>Thông Tin Tiếp Nhận</h2>
+          <div className="info-items" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="info-item">
-              <span className="icon">📧</span>
               <div>
-                <strong>Email</strong>
-                <p>your.email@example.com</p>
+                <strong style={{ color: '#1f2937' }}>Địa chỉ Thư điện tử</strong>
+                <p style={{ color: '#4b5563', margin: '0.2rem 0' }}>{emailInfo}</p>
               </div>
             </div>
             <div className="info-item">
-              <span className="icon">📱</span>
               <div>
-                <strong>Điện Thoại</strong>
-                <p>+84 xxx xxx xxx</p>
+                <strong style={{ color: '#1f2937' }}>Đường dây kết nối</strong>
+                <p style={{ color: '#4b5563', margin: '0.2rem 0' }}>{phoneInfo}</p>
               </div>
             </div>
             <div className="info-item">
-              <span className="icon">📍</span>
               <div>
-                <strong>Địa Chỉ</strong>
-                <p>Thành phố của bạn, Vietnam</p>
+                <strong style={{ color: '#1f2937' }}>Địa điểm làm việc</strong>
+                <p style={{ color: '#4b5563', margin: '0.2rem 0' }}>{addressInfo}</p>
               </div>
             </div>
           </div>
 
-          <div className="social-info">
-            <h3>Kết Nối Với Tôi</h3>
-            <div className="social-links">
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer">
-                🐙 GitHub
-              </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer">
-                💼 LinkedIn
-              </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer">
-                🐦 Twitter
-              </a>
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer">
-                👥 Facebook
-              </a>
+          <div className="social-info" style={{ marginTop: '2.5rem', paddingTop: '2rem', borderTop: '1px solid #f3f4f6' }}>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Mạng Xã Hội Chuyên Môn</h3>
+            <div className="social-links" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {socialLinks.github && <a href={socialLinks.github} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>GitHub Profile</a>}
+              {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>LinkedIn Network</a>}
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="contact-form">
-          <h2>Gửi Tin Nhắn</h2>
+        <form onSubmit={handleSubmit} className="contact-form" style={{ backgroundColor: '#ffffff', padding: '2.5rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.01)' }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', color: '#111827' }}>Để Lại Lời Nhắn</h2>
           
-          <div className="form-group">
-            <label htmlFor="name">Tên của bạn</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              placeholder="Nhập tên"
-            />
+          <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.4rem' }}>Họ và tên người liên hệ</label>
+            <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} required placeholder="Nhập tên của bạn" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d1d5db' }} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="your@email.com"
-            />
+          <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.4rem' }}>Địa chỉ email phản hồi</label>
+            <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required placeholder="your@email.com" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d1d5db' }} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="subject">Chủ Đề</label>
-            <input
-              type="text"
-              id="subject"
-              name="subject"
-              value={formData.subject}
-              onChange={handleChange}
-              required
-              placeholder="Chủ đề tin nhắn"
-            />
+          <div className="form-group" style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.4rem' }}>Tiêu đề nội dung</label>
+            <input type="text" id="subject" name="subject" value={formData.subject} onChange={handleChange} required placeholder="Chủ đề cuộc trao đổi" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d1d5db' }} />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="message">Tin Nhắn</label>
-            <textarea
-              id="message"
-              name="message"
-              value={formData.message}
-              onChange={handleChange}
-              required
-              placeholder="Nhập tin nhắn của bạn..."
-              rows="6"
-            />
+          <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+            <label style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.4rem' }}>Nội dung chi tiết văn bản</label>
+            <textarea id="message" name="message" value={formData.message} onChange={handleChange} required placeholder="Nội dung lời nhắn của bạn gửi đến hệ thống..." rows="5" style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d1d5db', resize: 'vertical' }} />
           </div>
 
-          {error && <p style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>}
-          <button type="submit" className="btn btn-primary" disabled={loading || submitted}>
-            {loading ? '⏳ Đang gửi...' : submitted ? '✅ Đã Gửi!' : '📤 Gửi Tin Nhắn'}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.8rem', borderRadius: '6px' }} disabled={loading}>
+            {loading ? 'Đang xử lý dữ liệu...' : 'Gửi Yêu Cầu Kết Nối'}
           </button>
         </form>
       </div>
 
-      <div className="contact-note">
-        <p>
-          ✅ <strong>Lưu ý:</strong> Tin nhắn của bạn sẽ được lưu vào Supabase database.
-          Để nhận email notification, vui lòng setup <strong>SendGrid</strong> hoặc <strong>Resend</strong>.
-        </p>
-      </div>
+      {/* Thay thế hoàn toàn alert() mặc định */}
+      <NotificationModal 
+        open={modal.open} 
+        type={modal.type} 
+        title={modal.title} 
+        message={modal.message} 
+        onClose={() => setModal({ ...modal, open: false })} 
+      />
     </section>
   );
 }
