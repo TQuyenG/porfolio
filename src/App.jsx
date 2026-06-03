@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -7,7 +7,7 @@ import About from './pages/About';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Blog from './pages/Blog';
-import BlogPostDetail from './pages/BlogPostDetail'; // Thêm trang chi tiết Blog
+import BlogPostDetail from './pages/BlogPostDetail';
 import Resume from './pages/Resume';
 import Private from './pages/Private';
 import Contact from './pages/Contact';
@@ -15,7 +15,7 @@ import './styles/App.css';
 
 function App() {
   return (
-    <Router>
+    <Router basename={process.env.PUBLIC_URL}>
       <div className="app">
         <Navigation />
         <main className="main-content">
@@ -25,7 +25,7 @@ function App() {
             <Route path="/projects" element={<Projects />} />
             <Route path="/projects/:slug" element={<ProjectDetail />} />
             <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:slug" element={<BlogPostDetail />} /> {/* Route cho bài viết */}
+            <Route path="/blog/:slug" element={<BlogPostDetail />} />
             <Route path="/resume" element={<Resume />} />
             <Route path="/admin" element={<Private />} />
             <Route path="/contact" element={<Contact />} />
