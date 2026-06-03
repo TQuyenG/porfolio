@@ -15,62 +15,84 @@ function Blog() {
     })();
   }, []);
 
-  // Chỉ lấy bài viết KHÔNG BỊ ẨN VÀ KHÔNG PHẢI LÀ BẢN NHÁP
   const rawPosts = (content?.posts || []).filter(p => !p.isHidden && !p.isDraft);
   const categories = ['Tất cả', ...new Set(rawPosts.map(p => p.category).filter(Boolean))];
+  
   const filteredPosts = activeCategory === 'Tất cả' ? rawPosts : rawPosts.filter(p => p.category === activeCategory);
   const sortedPosts = [...filteredPosts].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
   
+  // Trích xuất bài đầu tiên làm Featured Post chiếm full-width
   const featuredPost = sortedPosts.length > 0 ? sortedPosts[0] : null;
   const standardPosts = sortedPosts.length > 1 ? sortedPosts.slice(1) : [];
 
   return (
-    <section className="page blog-page" style={{ padding: '3rem 1rem', maxWidth: '1100px', margin: '0 auto' }}>
+    <section className="page blog-page" style={{ maxWidth: '1100px', margin: '0 auto', padding: '2rem 1.5rem' }}>
+      
       <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-        <h1 style={{ fontSize: '2.8rem', fontWeight: 800, color: '#111827', fontFamily: 'Georgia, serif' }}>{content?.pageTitle || 'Góc Chia Sẻ & Phân Tích'}</h1>
+        <h1 style={{ fontSize: 'var(--font-h1)', fontWeight: 800, color: 'var(--text-main)' }}>{content?.pageTitle || 'Góc Chia Sẻ Kiến Thức'}</h1>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '3rem', borderBottom: '2px solid #f3f4f6', paddingBottom: '1.5rem' }}>
+      {/* FILTER CATEGORY */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '3rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem' }}>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)} style={{ background: 'none', border: 'none', padding: '0.5rem 1rem', fontSize: '1.05rem', fontWeight: activeCategory === cat ? 700 : 500, color: activeCategory === cat ? '#2563eb' : '#4b5563', borderBottom: activeCategory === cat ? '2px solid #2563eb' : '2px solid transparent', cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{cat}</button>
+          <button 
+            key={cat} 
+            onClick={() => setActiveCategory(cat)} 
+            style={{ 
+              background: 'none', border: 'none', padding: '0.5rem 1.2rem', fontSize: 'var(--font-body)', cursor: 'pointer', transition: 'all 0.2s',
+              fontWeight: activeCategory === cat ? 700 : 500,
+              color: activeCategory === cat ? 'var(--primary-color)' : 'var(--text-sub)',
+              borderBottom: activeCategory === cat ? '2px solid var(--primary-color)' : '2px solid transparent'
+            }}
+          >
+            {cat}
+          </button>
         ))}
       </div>
 
+      {/* FEATURED POST (FULL WIDTH) */}
       {featuredPost && (
-        <div style={{ marginBottom: '4rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-          {featuredPost.coverImage && <img src={featuredPost.coverImage} alt={featuredPost.title} style={{ width: '100%', height: '100%', minHeight: '350px', objectFit: 'cover' }} />}
+        <div style={{ marginBottom: '4rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2.5rem', alignItems: 'center', backgroundColor: 'var(--bg-white)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+          {featuredPost.coverImage && (
+            <img src={featuredPost.coverImage} alt={featuredPost.title} style={{ width: '100%', height: '100%', minHeight: '300px', maxHeight: '400px', objectFit: 'cover' }} />
+          )}
           <div style={{ padding: '2.5rem' }}>
-            <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '0.4rem 1rem', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>{featuredPost.category || 'Nổi bật'}</span>
-            <h2 style={{ fontSize: '2.2rem', margin: '1rem 0', lineHeight: '1.3', color: '#111827', fontFamily: 'Georgia, serif' }}><Link to={`/blog/${featuredPost.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>{featuredPost.title}</Link></h2>
-            
-            {/* RICH TEXT CHO BÀI FEATURED */}
-            <div style={{ color: '#4b5563', fontSize: '1.1rem', lineHeight: '1.7', marginBottom: '1.5rem' }} dangerouslySetInnerHTML={{ __html: featuredPost.excerpt }} />
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', color: '#6b7280', fontSize: '0.9rem', fontWeight: 500 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FiClock /> {featuredPost.date}</span>
-              <Link to={`/blog/${featuredPost.slug}`} style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>Đọc tiếp <FiBookOpen /></Link>
+            <span style={{ backgroundColor: 'var(--highlight-color)', color: 'var(--primary-color)', padding: '0.3rem 0.8rem', borderRadius: '4px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>{featuredPost.category}</span>
+            <h2 style={{ fontSize: 'var(--font-h2)', fontWeight: 800, margin: '1rem 0 1.2rem 0', color: 'var(--text-main)', lineHeight: '1.3' }}>
+              <Link to={`/blog/${featuredPost.slug}`} style={{ color: 'inherit', textDecoration: 'none' }}>{featuredPost.title}</Link>
+            </h2>
+            <div style={{ color: 'var(--text-sub)', fontSize: 'var(--font-body)', marginBottom: '2rem', lineHeight: '1.7' }} dangerouslySetInnerHTML={{ __html: featuredPost.excerpt }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-small)', color: 'var(--text-sub)' }}><FiClock /> {featuredPost.date}</span>
+              <Link to={`/blog/${featuredPost.slug}`} style={{ color: 'var(--primary-color)', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>Đọc bài viết <FiBookOpen /></Link>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2.5rem' }}>
+      {/* GRID 3 CỘT CHO CÁC BÀI TIẾP THEO */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2.5rem' }}>
         {standardPosts.map(post => (
-          <div key={post.id} style={{ display: 'flex', flexDirection: 'column' }}>
-            <Link to={`/blog/${post.slug}`} style={{ display: 'block', overflow: 'hidden', borderRadius: '12px', marginBottom: '1rem', height: '220px' }}>
-              <img src={post.coverImage || 'https://via.placeholder.com/600x400?text=Blog+Cover'} alt={post.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s ease' }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} />
-            </Link>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '0.5rem' }}>
-              <span style={{ color: '#2563eb', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase' }}>{post.category}</span>
-              <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>• {post.date}</span>
+          <div key={post.id} style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-white)', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+            {post.coverImage && (
+              <Link to={`/blog/${post.slug}`} style={{ display: 'block', height: '200px', overflow: 'hidden' }}>
+                <img src={post.coverImage} alt={post.title} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.3s' }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'} />
+              </Link>
+            )}
+            <div style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '0.6rem', fontSize: '12px' }}>
+                <span style={{ color: 'var(--primary-color)', fontWeight: 700, textTransform: 'uppercase' }}>{post.category}</span>
+                <span style={{ color: 'var(--text-sub)' }}>• {post.date}</span>
+              </div>
+              <h3 style={{ fontSize: 'var(--font-h4)', fontWeight: 800, lineHeight: '1.4', marginBottom: '1rem' }}>
+                <Link to={`/blog/${post.slug}`} style={{ color: 'var(--text-main)', textDecoration: 'none' }}>{post.title}</Link>
+              </h3>
+              <div style={{ color: 'var(--text-sub)', fontSize: 'var(--font-small)', lineHeight: '1.6', flex: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: post.excerpt }} />
             </div>
-            <h3 style={{ fontSize: '1.35rem', lineHeight: '1.4', marginBottom: '0.8rem', fontFamily: 'Georgia, serif' }}><Link to={`/blog/${post.slug}`} style={{ color: '#111827', textDecoration: 'none' }}>{post.title}</Link></h3>
-            
-            {/* RICH TEXT CHO BÀI CHUẨN MỰC BÌNH THƯỜNG */}
-            <div style={{ color: '#6b7280', lineHeight: '1.6', fontSize: '0.95rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: post.excerpt }} />
           </div>
         ))}
       </div>
+
     </section>
   );
 }

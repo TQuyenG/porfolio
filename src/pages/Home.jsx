@@ -4,9 +4,6 @@ import '../styles/pages.css';
 import { getPageContent } from '../utils/supabaseClient';
 import { FiChevronLeft, FiChevronRight, FiX, FiStar, FiClock, FiMapPin, FiArrowRight, FiBriefcase, FiTrendingUp, FiUsers, FiZap } from 'react-icons/fi';
 
-/* ─── tiny helper: strip html tags for plain-text fallback ─── */
-const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
-
 /* ─── Animated counter ─── */
 function CountUp({ target, suffix = '' }) {
   const [count, setCount] = useState(0);
@@ -16,7 +13,7 @@ function CountUp({ target, suffix = '' }) {
       if (!entry.isIntersecting) return;
       observer.disconnect();
       let start = 0;
-      const step = Math.ceil(target / 50);
+      const step = Math.ceil(target / 50) || 1;
       const timer = setInterval(() => {
         start += step;
         if (start >= target) { setCount(target); clearInterval(timer); }
@@ -51,10 +48,10 @@ function Home() {
   const ctas       = content?.ctas       || [{ text: 'Xem Dự Án', href: '/projects', variant: 'primary' }, { text: 'Liên Hệ', href: '/contact', variant: 'secondary' }];
   const gallery    = content?.gallery    || [];
   const avatarUrl  = content?.avatarUrl  || null;
+  const bannerUrl  = content?.bannerUrl  || null;
   const location   = content?.location   || 'Ho Chi Minh City, Vietnam';
   const openToWork = content?.openToWork !== false;
 
-  /* Stats – admin có thể tuỳ chỉnh */
   const stats = content?.stats || [
     { icon: 'briefcase', value: 5,  suffix: '+', label: 'Dự Án BA' },
     { icon: 'trending',  value: 2,  suffix: '+', label: 'Năm Kinh Nghiệm' },
@@ -62,7 +59,6 @@ function Home() {
     { icon: 'zap',       value: 3,  suffix: '',  label: 'Lĩnh Vực Chuyên Môn' },
   ];
 
-  /* Highlighted skills – admin tự thêm */
   const highlightedSkills = content?.highlightedSkills || [
     'Requirements Elicitation', 'BPMN / UML', 'SQL & Data Analysis',
     'Agile / Scrum', 'Stakeholder Management', 'Figma Wireframing',
@@ -78,47 +74,59 @@ function Home() {
   return (
     <section className="page home-page hp-root" style={{ padding: 0, overflow: 'hidden' }}>
 
-      {/* ═══════════════ INLINE STYLES ═══════════════ */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap');
 
         .hp-root { font-family: 'Plus Jakarta Sans', sans-serif; }
 
-        /* ── HERO ── */
+        /* ── CẤU TRÚC HERO CHUẨN (SỬA LỖI VỊ TRÍ & MÀU NỀN) ── */
         .hp-hero {
           position: relative;
-          min-height: 100svh;
-          display: grid;
-          grid-template-columns: 1fr;
-          align-items: center;
-          padding: clamp(5rem,10vw,8rem) clamp(1rem,5vw,4rem) clamp(3rem,6vw,5rem);
-          background-color: #0a0f1e;
+          min-height: calc(100svh - 60px);
+          display: flex;
+          align-items: center; /* Ép nội dung chữ nằm giữa theo chiều dọc */
+          padding: 4rem 5%;
           color: #fff;
-          overflow: hidden;
           margin-top: -60px;
+          /* Màu dự phòng: Xám đen chuyên nghiệp (Slate 900), khử hoàn toàn màu tím */
+          background-color: #0f172a; 
+          background-size: cover;
+          background-position: center;
         }
+        
         .hp-hero-bg {
           position: absolute; inset: 0; z-index: 0;
-          background: radial-gradient(ellipse 70% 60% at 80% 20%, rgba(56,189,248,0.12) 0%, transparent 60%),
-                      radial-gradient(ellipse 60% 50% at 10% 80%, rgba(99,102,241,0.10) 0%, transparent 60%);
+          background: radial-gradient(ellipse 70% 60% at 80% 20%, rgba(56,189,248,0.08) 0%, transparent 60%),
+                      radial-gradient(ellipse 60% 50% at 10% 80%, rgba(14,165,233,0.05) 0%, transparent 60%);
         }
         .hp-hero-bg::after {
-          content:'';
-          position:absolute; inset:0;
-          background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+          content:''; position:absolute; inset:0;
+          background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
           background-size: 28px 28px;
         }
-        .hp-hero-inner { position: relative; z-index: 1; max-width: 860px; animation: hp-fadeUp 0.9s ease both; }
+
+        .hp-hero-inner {
+          position: relative; z-index: 2; 
+          width: 100%; max-width: 1200px; margin: 0 auto;
+          display: flex;
+          animation: hp-fadeUp 0.9s ease both;
+        }
         @keyframes hp-fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
+
+        .hp-hero-text {
+          width: 100%;
+          padding-top: 40px; /* Đẩy nhẹ xuống để không dính Navbar */
+        }
 
         .hp-badge {
           display: inline-flex; align-items: center; gap: 8px;
-          background: rgba(99,102,241,0.18); border: 1px solid rgba(99,102,241,0.4);
-          color: #a5b4fc; padding: 0.45rem 1.1rem; border-radius: 99px;
+          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+          color: #e2e8f0; padding: 0.45rem 1.1rem; border-radius: 99px;
           font-size: clamp(0.75rem,2vw,0.88rem); font-weight: 700;
           letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 2rem;
+          backdrop-filter: blur(4px);
         }
-        .hp-badge-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; animation: hp-pulse 2s infinite; }
+        .hp-badge-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; box-shadow: 0 0 8px #4ade80; animation: hp-pulse 2s infinite; }
         @keyframes hp-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
         .hp-hero h1 {
@@ -140,18 +148,16 @@ function Home() {
           font-size: clamp(0.95rem,2vw,1.1rem); color: #cbd5e1;
           line-height: 1.85; max-width: 600px; margin-bottom: 2.8rem;
         }
-        .hp-hero-intro p { margin: 0; }
 
         .hp-cta-row { display: flex; gap: 1rem; flex-wrap: wrap; }
         .hp-btn-primary {
           display: inline-flex; align-items: center; gap: 8px;
-          background: linear-gradient(135deg,#6366f1,#38bdf8);
+          background: linear-gradient(135deg,#2563eb,#38bdf8);
           color: #fff; padding: 0.85rem 2.2rem; border-radius: 12px;
           font-weight: 700; font-size: clamp(0.9rem,2vw,1rem);
           text-decoration: none; transition: all 0.25s; border: none; cursor: pointer;
-          box-shadow: 0 4px 20px rgba(99,102,241,0.35);
         }
-        .hp-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(99,102,241,0.5); color:#fff; }
+        .hp-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(37,99,235,0.4); color:#fff; }
         .hp-btn-outline {
           display: inline-flex; align-items: center; gap: 8px;
           background: transparent; color: #e2e8f0;
@@ -162,33 +168,38 @@ function Home() {
         }
         .hp-btn-outline:hover { border-color: #38bdf8; color: #38bdf8; }
 
-        /* Avatar absolute (desktop only) */
         .hp-avatar-wrap {
           display: none;
         }
+
+        /* KHỐI ẢNH CHÂN DUNG OUT-OF-BOUND (CHỈ HIỆN TRÊN DESKTOP) */
         @media (min-width: 900px) {
-          .hp-hero { grid-template-columns: 1fr auto; gap: 3rem; }
+          .hp-hero-text {
+            max-width: 55%; /* Ép chữ nằm gọn bên trái */
+          }
           .hp-avatar-wrap {
-            display: flex; align-items: center; justify-content: center;
-            position: relative; z-index: 1; animation: hp-fadeUp 1.1s 0.2s ease both;
+            display: block;
+            position: absolute;
+            bottom: 0;         /* KHÓA CHẶT ẢNH DÍNH VÀO ĐƯỜNG BIÊN DƯỚI */
+            right: 5%;         /* Căn lề phải 5% */
+            height: 85%;       /* Thu nhỏ ảnh lại theo yêu cầu (chiếm 85% chiều cao) */
+            max-width: 40%;    /* Giới hạn độ rộng để không đè lên chữ */
+            z-index: 1;        
+            pointer-events: none;
+            animation: hp-fadeUp 1.1s 0.2s ease both;
           }
-          .hp-avatar-wrap img, .hp-avatar-placeholder {
-            width: clamp(200px,22vw,280px); height: clamp(200px,22vw,280px);
-            border-radius: 50%; object-fit: cover;
-            border: 3px solid rgba(56,189,248,0.4);
-            box-shadow: 0 0 0 12px rgba(56,189,248,0.06), 0 20px 60px rgba(0,0,0,0.4);
-          }
-          .hp-avatar-placeholder {
-            background: linear-gradient(135deg,#6366f1,#38bdf8);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 4rem;
+          .hp-avatar-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: bottom right; /* Bắt buộc ảnh luôn rớt sát xuống đáy */
+            filter: drop-shadow(-15px 15px 25px rgba(0,0,0,0.5));
           }
         }
 
-        /* location row */
         .hp-location {
           display: inline-flex; align-items: center; gap: 6px;
-          color: #64748b; font-size: 0.85rem; margin-bottom: 1.5rem;
+          color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;
         }
 
         /* ── STATS BAR ── */
@@ -208,12 +219,11 @@ function Home() {
           border: 1px solid #f1f5f9; border-radius: 16px;
           transition: box-shadow 0.2s, transform 0.2s;
         }
-        .hp-stat-card:hover { box-shadow: 0 8px 24px rgba(99,102,241,0.12); transform: translateY(-3px); }
+        .hp-stat-card:hover { box-shadow: 0 8px 24px rgba(37,99,235,0.08); transform: translateY(-3px); }
         .hp-stat-icon {
           width: 44px; height: 44px; border-radius: 12px;
-          background: linear-gradient(135deg,#ede9fe,#dbeafe);
-          display: flex; align-items: center; justify-content: center;
-          color: #6366f1; font-size: 1.2rem; margin: 0 auto 0.9rem;
+          background: #eff6ff; display: flex; align-items: center; justify-content: center;
+          color: #2563eb; font-size: 1.2rem; margin: 0 auto 0.9rem;
         }
         .hp-stat-num {
           font-family: 'Fraunces', serif;
@@ -235,7 +245,7 @@ function Home() {
           font-size: clamp(0.78rem,1.8vw,0.88rem); font-weight: 600;
           transition: all 0.2s;
         }
-        .hp-skill-tag:hover { border-color: #6366f1; color: #6366f1; background: #ede9fe; }
+        .hp-skill-tag:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
 
         /* ── PINNED PROJECTS ── */
         .hp-projects { padding: clamp(3rem,6vw,5rem) clamp(1rem,5vw,4rem); background: #fff; }
@@ -264,8 +274,8 @@ function Home() {
           transition: all 0.3s cubic-bezier(0.23,1,0.32,1);
           background: #fff;
         }
-        .hp-proj-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(15,23,42,0.08); border-color: #e0e7ff; }
-        .hp-proj-accent { height: 4px; background: linear-gradient(90deg,#6366f1,#38bdf8); }
+        .hp-proj-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(15,23,42,0.08); border-color: #dbeafe; }
+        .hp-proj-accent { height: 4px; background: linear-gradient(90deg,#2563eb,#38bdf8); }
         .hp-proj-body { padding: clamp(1.2rem,3vw,1.8rem); flex:1; display:flex; flex-direction:column; }
         .hp-proj-pin-badge {
           display: inline-flex; align-items: center; gap: 5px;
@@ -277,7 +287,7 @@ function Home() {
         .hp-proj-duration { font-size: 0.82rem; color: #94a3b8; display: flex; align-items: center; gap: 5px; margin-bottom: 0.9rem; }
         .hp-proj-desc { color: #475569; font-size: clamp(0.85rem,2vw,0.95rem); line-height: 1.7; flex:1; margin-bottom: 1.2rem; }
         .hp-proj-techs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
-        .hp-proj-tech { background: #f0f4ff; color: #4f46e5; font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 8px; }
+        .hp-proj-tech { background: #eff6ff; color: #1d4ed8; font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 8px; }
         .hp-proj-link {
           display: inline-flex; align-items: center; gap: 6px;
           background: #0f172a; color: #fff;
@@ -285,7 +295,7 @@ function Home() {
           font-size: 0.88rem; text-decoration: none; transition: background 0.2s;
           align-self: flex-start;
         }
-        .hp-proj-link:hover { background: #1e293b; color: #fff; }
+        .hp-proj-link:hover { background: #1e293b; }
         .hp-all-projects-wrap { text-align: center; margin-top: clamp(2rem,4vw,3rem); }
         .hp-btn-ghost {
           display: inline-flex; align-items: center; gap: 8px;
@@ -294,7 +304,7 @@ function Home() {
           color: #475569; text-decoration: none; transition: all 0.2s;
           font-size: clamp(0.88rem,2vw,1rem);
         }
-        .hp-btn-ghost:hover { border-color: #6366f1; color: #6366f1; }
+        .hp-btn-ghost:hover { border-color: #2563eb; color: #2563eb; }
 
         /* ── GALLERY ── */
         .hp-gallery { padding: clamp(3rem,5vw,4rem) 0; background: #f8fafc; border-top: 1px solid #e2e8f0; overflow: hidden; }
@@ -312,7 +322,7 @@ function Home() {
           transition: all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
           border: 2px solid transparent;
         }
-        .hp-gallery-thumb:hover { transform: scale(1.08) translateY(-10px); box-shadow: 0 16px 40px rgba(0,0,0,0.15); border-color: #6366f1; }
+        .hp-gallery-thumb:hover { transform: scale(1.08) translateY(-10px); box-shadow: 0 16px 40px rgba(0,0,0,0.15); border-color: #2563eb; }
         .hp-gallery-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
 
         /* ── LIGHTBOX ── */
@@ -327,46 +337,48 @@ function Home() {
       `}</style>
 
       {/* ── HERO ── */}
-      <div className="hp-hero">
+      <div className="hp-hero" style={{
+        backgroundImage: bannerUrl ? `linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.75)), url(${bannerUrl})` : 'none'
+      }}>
         <div className="hp-hero-bg" />
+        
         <div className="hp-hero-inner">
-          {openToWork && (
-            <div className="hp-badge">
-              <span className="hp-badge-dot" />
-              Đang tìm kiếm cơ hội mới
-            </div>
-          )}
-          <h1>
-            {title.includes('Quyen') ? (
-              <>Xin Chào! Tôi là <em>Quyen</em></>
-            ) : (
-              title
+          <div className="hp-hero-text">
+            {openToWork && (
+              <div className="hp-badge">
+                <span className="hp-badge-dot" />
+                Đang tìm kiếm cơ hội mới
+              </div>
             )}
-          </h1>
-          <div className="hp-hero-tagline">
-            {tagline.split('·').map((t, i, arr) => (
-              <React.Fragment key={i}>{t.trim()}{i < arr.length - 1 && <span>·</span>}</React.Fragment>
-            ))}
-          </div>
-          {location && (
-            <div className="hp-location"><FiMapPin size={14} /> {location}</div>
-          )}
-          <div className="hp-hero-intro" dangerouslySetInnerHTML={{ __html: intro }} />
-          <div className="hp-cta-row">
-            {ctas.map((c, i) => (
-              c.variant === 'primary'
-                ? <a key={i} href={c.href} className="hp-btn-primary">{c.text} <FiArrowRight /></a>
-                : <a key={i} href={c.href} className="hp-btn-outline">{c.text}</a>
-            ))}
+            <h1>
+              {title.includes('Quyen') ? (
+                <>Xin Chào! Tôi là <em>Quyen</em></>
+              ) : (
+                title
+              )}
+            </h1>
+            <div className="hp-hero-tagline">
+              {tagline.split('·').map((t, i, arr) => (
+                <React.Fragment key={i}>{t.trim()}{i < arr.length - 1 && <span>·</span>}</React.Fragment>
+              ))}
+            </div>
+            {location && (
+              <div className="hp-location"><FiMapPin size={14} /> {location}</div>
+            )}
+            <div className="hp-hero-intro" dangerouslySetInnerHTML={{ __html: intro }} />
+            <div className="hp-cta-row">
+              {ctas.map((c, i) => (
+                c.variant === 'primary'
+                  ? <a key={i} href={c.href} className="hp-btn-primary">{c.text} <FiArrowRight /></a>
+                  : <a key={i} href={c.href} className="hp-btn-outline">{c.text}</a>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Avatar – chỉ hiện desktop */}
+        {/* Khối Avatar: Khóa chặt vào đáy của hp-hero */}
         <div className="hp-avatar-wrap">
-          {avatarUrl
-            ? <img src={avatarUrl} alt="Avatar" />
-            : <div className="hp-avatar-placeholder">🙋‍♀️</div>
-          }
+          {avatarUrl && <img src={avatarUrl} alt="Portrait" />}
         </div>
       </div>
 
