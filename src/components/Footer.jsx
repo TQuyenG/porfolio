@@ -26,9 +26,15 @@ function Footer() {
       <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2.5rem' }}>
         
         <div>
-          <h3 style={{ color: '#111827', fontSize: '1.4rem', fontWeight: 800, marginBottom: '1rem', letterSpacing: '1px' }}>QUYEN<span style={{ color: '#2563eb' }}>.</span></h3>
+          {/* SỬ DỤNG PUBLIC_URL ĐỂ FIX LỖI ĐƯỜNG DẪN ẢNH CHÂN TRANG */}
+          <Link to="/" style={{ display: 'inline-block', marginBottom: '1.2rem', transition: 'transform 0.2s ease' }} onMouseOver={e => e.currentTarget.style.transform='scale(1.05)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'}>
+            <img 
+              src={process.env.PUBLIC_URL + '/images/logo.png'} 
+              alt="Quyen Logo" 
+              style={{ height: '60px', width: 'auto', objectFit: 'contain', display: 'block' }} 
+            />
+          </Link>
           
-          {/* RICH TEXT CHO FOOTER BIO */}
           <div style={{ fontSize: '0.95rem', lineHeight: '1.7', color: '#6b7280' }} dangerouslySetInnerHTML={{ __html: footerBio }} />
         </div>
 
@@ -55,9 +61,9 @@ function Footer() {
       <div style={{ maxWidth: '1100px', margin: '3rem auto 0', paddingTop: '2rem', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
         <div style={{ fontSize: '0.85rem', color: '#9ca3af' }}>&copy; {currentYear} Quyen. Tất cả quyền được bảo lưu. Thiết kế hệ thống bởi BA.</div>
         <div style={{ display: 'flex', gap: '1.2rem' }}>
-          {social.github && <a href={social.github} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem' }}><FiGithub /></a>}
-          {social.linkedin && <a href={social.linkedin} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem' }}><FiLinkedin /></a>}
-          {social.facebook && <a href={social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem' }}><FiFacebook /></a>}
+          {social.github && <a href={social.github} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='#111827'} onMouseOut={e=>e.currentTarget.style.color='#6b7280'}><FiGithub /></a>}
+          {social.linkedin && <a href={social.linkedin} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='#2563eb'} onMouseOut={e=>e.currentTarget.style.color='#6b7280'}><FiLinkedin /></a>}
+          {social.facebook && <a href={social.facebook} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', fontSize: '1.2rem', transition: 'color 0.2s' }} onMouseOver={e=>e.currentTarget.style.color='#2563eb'} onMouseOut={e=>e.currentTarget.style.color='#6b7280'}><FiFacebook /></a>}
         </div>
       </div>
     </footer>

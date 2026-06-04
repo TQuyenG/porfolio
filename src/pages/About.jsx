@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getPageContent } from '../utils/supabaseClient';
 import { FiAward, FiBriefcase, FiBookOpen, FiExternalLink } from 'react-icons/fi';
+import PageHero from '../components/PageHero';
 
 export default function About() {
   const [content, setContent] = useState(null);
@@ -17,12 +18,16 @@ export default function About() {
     })();
   }, []);
 
+  // HỆ THỐNG LẮNG NGHE HIỆU ỨNG CUỘN TRANG (SCROLL REVEAL)
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add('is-visible');
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+        }
       });
     }, { threshold: 0.1 });
+    
     document.querySelectorAll('.reveal-section').forEach(sec => observer.observe(sec));
     return () => observer.disconnect();
   }, [content]);
@@ -38,61 +43,16 @@ export default function About() {
   const education = content?.education || [];
 
   return (
-    <div className="page about-page" style={{ paddingBottom: 'var(--gap, 96px)' }}>
-      <style>{`
-        /* Kỹ thuật phá lồng để banner bung tràn 100% chiều ngang và cao 80vh */
-        .ds-about-hero {
-          width: 100vw;
-          position: relative;
-          left: 50%;
-          right: 50%;
-          margin-left: -50vw;
-          margin-right: -50vw;
-          min-height: 80vh; 
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 0 1.5rem;
-          background-size: cover;
-          background-position: center;
-          margin-top: -80px; /* Chui xuống dưới Navbar */
-          padding-top: 80px;
-        }
-        .ds-about-overlay {
-          position: absolute; inset: 0; 
-          background-color: rgba(15, 23, 42, 0.85); /* Tone màu Slate 900 sang trọng */
-          z-index: 1;
-        }
-        .ds-timeline-item {
-          position: relative; padding-left: 32px; margin-bottom: 32px;
-        }
-        .ds-timeline-item::before {
-          content: ''; position: absolute; left: 0; top: 8px; width: 12px; height: 12px;
-          border-radius: 50%; background-color: var(--primary, #6366F1); border: 3px solid var(--highlight, #EDE9FE);
-        }
-        .ds-timeline-item::after {
-          content: ''; position: absolute; left: 5px; top: 24px; bottom: -32px;
-          width: 2px; background-color: var(--border, #E5E7EB);
-        }
-        .ds-timeline-item:last-child::after { display: none; }
-      `}</style>
+    <div className="page about-page" style={{ paddingBottom: 'clamp(3rem, 6vw, 6rem)' }}>
+      
+      <PageHero title={pageTitle} subtitle={subtitle} bgImage={coverUrl} />
 
-      {/* HERO BANNER FULL */}
-      <div className="ds-about-hero" style={{ backgroundImage: coverUrl ? `url(${coverUrl})` : 'none', backgroundColor: '#0f172a' }}>
-        <div className="ds-about-overlay" />
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: '1200px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ color: '#ffffff', fontSize: 'var(--font-h1, 48px)', fontWeight: 800, marginBottom: '16px', letterSpacing: '-1px' }}>{pageTitle}</h1>
-          <p style={{ color: 'var(--accent, #A78BFA)', fontSize: 'var(--font-h3, 24px)', fontWeight: 500 }}>{subtitle}</p>
-        </div>
-      </div>
-
-      {/* MAIN CONTENT VỚI KHOẢNG CÁCH CHUẨN DESIGN SYSTEM */}
-      <div style={{ maxWidth: '1200px', margin: 'var(--gap, 96px) auto 0', padding: '0 1.5rem', display: 'flex', flexDirection: 'column', gap: 'var(--gap, 96px)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 6vw, 6rem)' }}>
         
-        {/* BIO & ẢNH CHÂN DUNG */}
-        <section className="reveal-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '48px', alignItems: 'start' }}>
+        {/* KHỐI 1: VỀ TÔI */}
+        <section className="reveal-section mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '3rem', alignItems: 'start' }}>
           <div>
-            <h2 style={{ fontSize: 'var(--font-h2, 36px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '24px', letterSpacing: '-0.5px' }}>{intro.title}</h2>
+            <h2 style={{ fontSize: 'var(--font-h2, 36px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '1.5rem', letterSpacing: '-0.5px' }}>{intro.title}</h2>
             <div style={{ fontSize: 'var(--font-body, 16px)', color: 'var(--text-sub, #6B7280)', lineHeight: 1.8 }} dangerouslySetInnerHTML={{ __html: intro.body }} />
           </div>
           {portraitUrl && (
@@ -102,14 +62,14 @@ export default function About() {
           )}
         </section>
 
-        {/* SKILLS TAG CLOUD */}
+        {/* KHỐI 2: NĂNG LỰC */}
         {skills.length > 0 && (
           <section className="reveal-section">
-            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '24px' }}>Năng Lực Phân Tích & Kỹ Thuật</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '1.5rem' }}>Năng Lực Phân Tích & Kỹ Thuật</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
               {skills.map((skill, index) => (
-                <div key={index} style={{ background: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '12px', padding: '20px 24px', flex: '1 1 250px', transition: 'box-shadow 0.3s' }} onMouseOver={e => e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.03)'} onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}>
-                  <strong style={{ display: 'block', fontSize: 'var(--font-body, 16px)', color: 'var(--primary, #6366F1)', marginBottom: '8px' }}>{skill.title}</strong>
+                <div key={index} className="resume-box" style={{ background: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '12px', padding: '1.5rem', flex: '1 1 250px', transition: 'box-shadow 0.3s' }} onMouseOver={e => e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.03)'} onMouseOut={e => e.currentTarget.style.boxShadow = 'none'}>
+                  <strong style={{ display: 'block', fontSize: 'var(--font-body, 16px)', color: 'var(--primary, #6366F1)', marginBottom: '0.5rem' }}>{skill.title}</strong>
                   <span style={{ fontSize: 'var(--font-small, 14px)', color: 'var(--text-sub, #6B7280)', lineHeight: '1.6', display: 'block' }}>{Array.isArray(skill.items) ? skill.items.join(', ') : skill.items}</span>
                 </div>
               ))}
@@ -117,18 +77,21 @@ export default function About() {
           </section>
         )}
 
-        {/* TIMELINE KINH NGHIỆM */}
+        {/* KHỐI 3: KINH NGHIỆM */}
         {timeline.length > 0 && (
           <section className="reveal-section">
-            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}><FiBriefcase color="var(--primary, #6366F1)"/> Kinh Nghiệm Thực Tế</h3>
-            <div style={{ backgroundColor: 'var(--bg-white, #FFFFFF)', padding: '40px', borderRadius: '24px', border: '1px solid var(--border, #E5E7EB)' }}>
+            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}><FiBriefcase color="var(--primary, #6366F1)"/> Kinh Nghiệm Thực Tế</h3>
+            <div className="resume-box" style={{ backgroundColor: 'var(--bg-white, #FFFFFF)', padding: '2.5rem', borderRadius: '24px', border: '1px solid var(--border, #E5E7EB)' }}>
               {timeline.map((item, i) => (
-                <div key={i} className="ds-timeline-item">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <div key={i} style={{ position: 'relative', paddingLeft: '2rem', marginBottom: '2rem' }}>
+                  <div style={{ content: '""', position: 'absolute', left: 0, top: '8px', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--primary, #6366F1)', border: '3px solid var(--highlight, #EDE9FE)' }} />
+                  {i !== timeline.length - 1 && <div style={{ content: '""', position: 'absolute', left: '5px', top: '24px', bottom: '-32px', width: '2px', backgroundColor: 'var(--border, #E5E7EB)' }} />}
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', marginBottom: '0.5rem', gap: '0.5rem' }}>
                     <h4 style={{ fontSize: 'var(--font-h4, 18px)', fontWeight: 700, color: 'var(--text-main, #1E1B4B)', margin: 0 }}>{item.title}</h4>
-                    <span style={{ fontSize: 'var(--font-small, 14px)', color: 'var(--primary, #6366F1)', fontWeight: 700, backgroundColor: 'var(--highlight, #EDE9FE)', padding: '4px 12px', borderRadius: '20px' }}>{item.year}</span>
+                    <span style={{ fontSize: 'var(--font-small, 14px)', color: 'var(--primary, #6366F1)', fontWeight: 700, backgroundColor: 'var(--highlight, #EDE9FE)', padding: '0.2rem 0.8rem', borderRadius: '20px' }}>{item.year}</span>
                   </div>
-                  <p style={{ color: 'var(--text-sub, #6B7280)', fontWeight: 600, fontSize: 'var(--font-body, 16px)', marginBottom: '12px', fontStyle: 'italic' }}>{item.company}</p>
+                  <p style={{ color: 'var(--text-sub, #6B7280)', fontWeight: 600, fontSize: 'var(--font-body, 16px)', marginBottom: '0.8rem', fontStyle: 'italic' }}>{item.company}</p>
                   <div style={{ color: 'var(--text-sub, #6B7280)', fontSize: 'var(--font-body, 16px)', lineHeight: 1.7 }} dangerouslySetInnerHTML={{ __html: item.desc }} />
                 </div>
               ))}
@@ -136,14 +99,14 @@ export default function About() {
           </section>
         )}
 
-        {/* CHỨNG CHỈ THÀNH TỰU */}
+        {/* KHỐI 4: CHỨNG CHỈ */}
         {achievements.length > 0 && (
           <section id="achievements" className="reveal-section" style={{ scrollMarginTop: '100px' }}>
-            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}><FiAward color="var(--primary, #6366F1)"/> Thành Tựu & Chứng Chỉ</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}><FiAward color="var(--primary, #6366F1)"/> Thành Tựu & Chứng Chỉ</h3>
+            <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1.5rem' }}>
               {achievements.map((ach, idx) => (
-                <div key={idx} style={{ background: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer' }} onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; }} onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div key={idx} className="resume-box" style={{ background: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '16px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer' }} onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.05)'; }} onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     {ach.logo ? (
                       <img src={ach.logo} alt="Org" style={{ width: '56px', height: '56px', objectFit: 'contain' }} />
                     ) : (
@@ -155,7 +118,7 @@ export default function About() {
                     </div>
                   </div>
                   {ach.url && (
-                    <a href={ach.url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--font-small, 14px)', color: 'var(--primary, #6366F1)', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', marginTop: 'auto', padding: '8px 12px', backgroundColor: 'var(--surface, #FAFAFA)', borderRadius: '8px', width: 'fit-content' }}>Kiểm tra chứng chỉ <FiExternalLink/></a>
+                    <a href={ach.url} target="_blank" rel="noreferrer" style={{ fontSize: 'var(--font-small, 14px)', color: 'var(--primary, #6366F1)', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'auto', padding: '0.5rem 0.8rem', backgroundColor: 'var(--surface, #FAFAFA)', borderRadius: '8px', width: 'fit-content' }}>Kiểm tra chứng chỉ <FiExternalLink/></a>
                   )}
                 </div>
               ))}
@@ -163,14 +126,14 @@ export default function About() {
           </section>
         )}
 
-        {/* EDUCATION */}
+        {/* KHỐI 5: HỌC VẤN */}
         {education.length > 0 && (
           <section className="reveal-section">
-            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}><FiBookOpen color="var(--primary, #6366F1)"/> Nền Tảng Học Vấn</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h3 style={{ fontSize: 'var(--font-h3, 24px)', fontWeight: 800, color: 'var(--text-main, #1E1B4B)', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.8rem' }}><FiBookOpen color="var(--primary, #6366F1)"/> Nền Tảng Học Vấn</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               {education.map((edu, idx) => (
-                <div key={idx} style={{ padding: '24px', backgroundColor: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '16px' }}>
-                  <h4 style={{ fontSize: 'var(--font-h4, 18px)', fontWeight: 700, color: 'var(--text-main, #1E1B4B)', marginBottom: '6px', margin: 0 }}>{edu.title}</h4>
+                <div key={idx} className="resume-box" style={{ padding: '1.5rem', backgroundColor: 'var(--bg-white, #FFFFFF)', border: '1px solid var(--border, #E5E7EB)', borderRadius: '16px' }}>
+                  <h4 style={{ fontSize: 'var(--font-h4, 18px)', fontWeight: 700, color: 'var(--text-main, #1E1B4B)', marginBottom: '0.4rem', margin: 0 }}>{edu.title}</h4>
                   <p style={{ fontSize: 'var(--font-body, 16px)', color: 'var(--text-sub, #6B7280)', margin: 0 }}>
                     <strong style={{ color: 'var(--primary, #6366F1)' }}>{edu.company}</strong> <span style={{ margin: '0 8px', color: 'var(--border, #E5E7EB)' }}>|</span> {edu.date}
                   </p>

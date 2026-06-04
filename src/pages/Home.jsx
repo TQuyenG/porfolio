@@ -42,6 +42,20 @@ function Home() {
     })();
   }, []);
 
+  // 🚀 BỘ CẢM BIẾN HIỆU ỨNG CUỘN (SCROLL REVEAL) - FIX LỖI TÀNG HÌNH
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+        }
+      });
+    }, { threshold: 0.1 });
+    
+    document.querySelectorAll('.reveal-section').forEach(sec => observer.observe(sec));
+    return () => observer.disconnect();
+  }, [content, pinnedProjects]);
+
   const title      = content?.title      || 'Xin Chào! Tôi là Quyen';
   const tagline    = content?.tagline    || 'Business Analyst Intern · Web Developer';
   const intro      = content?.intro      || 'Tôi đam mê phân tích nghiệp vụ hệ thống và xây dựng các giải pháp tối ưu hóa quy trình.';
@@ -72,23 +86,22 @@ function Home() {
   const prevImage = (e) => { e.stopPropagation(); setLightboxIndex(p => (p === 0 ? gallery.length - 1 : p - 1)); };
 
   return (
-    <section className="page home-page hp-root" style={{ padding: 0, overflow: 'hidden' }}>
+    <section className="page home-page hp-root" style={{ padding: 0, overflowX: 'hidden' }}>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap');
 
         .hp-root { font-family: 'Plus Jakarta Sans', sans-serif; }
 
-        /* ── CẤU TRÚC HERO CHUẨN (SỬA LỖI VỊ TRÍ & MÀU NỀN) ── */
+        /* ── HERO ── */
         .hp-hero {
           position: relative;
           min-height: calc(100svh - 60px);
           display: flex;
-          align-items: center; /* Ép nội dung chữ nằm giữa theo chiều dọc */
+          align-items: center; 
           padding: 4rem 5%;
           color: #fff;
           margin-top: -60px;
-          /* Màu dự phòng: Xám đen chuyên nghiệp (Slate 900), khử hoàn toàn màu tím */
           background-color: #0f172a; 
           background-size: cover;
           background-position: center;
@@ -115,7 +128,7 @@ function Home() {
 
         .hp-hero-text {
           width: 100%;
-          padding-top: 40px; /* Đẩy nhẹ xuống để không dính Navbar */
+          padding-top: 40px; 
         }
 
         .hp-badge {
@@ -148,6 +161,7 @@ function Home() {
           font-size: clamp(0.95rem,2vw,1.1rem); color: #cbd5e1;
           line-height: 1.85; max-width: 600px; margin-bottom: 2.8rem;
         }
+        .hp-hero-intro p { margin: 0; }
 
         .hp-cta-row { display: flex; gap: 1rem; flex-wrap: wrap; }
         .hp-btn-primary {
@@ -175,15 +189,15 @@ function Home() {
         /* KHỐI ẢNH CHÂN DUNG OUT-OF-BOUND (CHỈ HIỆN TRÊN DESKTOP) */
         @media (min-width: 900px) {
           .hp-hero-text {
-            max-width: 55%; /* Ép chữ nằm gọn bên trái */
+            max-width: 55%; 
           }
           .hp-avatar-wrap {
             display: block;
             position: absolute;
-            bottom: 0;         /* KHÓA CHẶT ẢNH DÍNH VÀO ĐƯỜNG BIÊN DƯỚI */
-            right: 5%;         /* Căn lề phải 5% */
-            height: 85%;       /* Thu nhỏ ảnh lại theo yêu cầu (chiếm 85% chiều cao) */
-            max-width: 40%;    /* Giới hạn độ rộng để không đè lên chữ */
+            bottom: 0;         
+            right: 5%;         
+            height: 85%;       
+            max-width: 40%;    
             z-index: 1;        
             pointer-events: none;
             animation: hp-fadeUp 1.1s 0.2s ease both;
@@ -192,7 +206,7 @@ function Home() {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            object-position: bottom right; /* Bắt buộc ảnh luôn rớt sát xuống đáy */
+            object-position: bottom right; 
             filter: drop-shadow(-15px 15px 25px rgba(0,0,0,0.5));
           }
         }
@@ -366,12 +380,23 @@ function Home() {
               <div className="hp-location"><FiMapPin size={14} /> {location}</div>
             )}
             <div className="hp-hero-intro" dangerouslySetInnerHTML={{ __html: intro }} />
+            
             <div className="hp-cta-row">
-              {ctas.map((c, i) => (
-                c.variant === 'primary'
-                  ? <a key={i} href={c.href} className="hp-btn-primary">{c.text} <FiArrowRight /></a>
-                  : <a key={i} href={c.href} className="hp-btn-outline">{c.text}</a>
-              ))}
+              {ctas.map((c, i) => {
+                const isInternal = c.href.startsWith('/');
+                if (isInternal) {
+                  return (
+                    <Link key={i} to={c.href} className={c.variant === 'primary' ? "hp-btn-primary" : "hp-btn-outline"}>
+                      {c.text} {c.variant === 'primary' && <FiArrowRight />}
+                    </Link>
+                  );
+                }
+                return (
+                  <a key={i} href={c.href} target="_blank" rel="noreferrer" className={c.variant === 'primary' ? "hp-btn-primary" : "hp-btn-outline"}>
+                    {c.text} {c.variant === 'primary' && <FiArrowRight />}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -386,7 +411,7 @@ function Home() {
       <div className="hp-stats-bar">
         <div className="hp-stats-grid">
           {stats.map((s, i) => (
-            <div className="hp-stat-card" key={i}>
+            <div className="hp-stat-card reveal-section" key={i}>
               <div className="hp-stat-icon">{iconMap[s.icon] || <FiZap />}</div>
               <div className="hp-stat-num"><CountUp target={s.value} suffix={s.suffix} /></div>
               <div className="hp-stat-label">{s.label}</div>
@@ -397,7 +422,7 @@ function Home() {
 
       {/* ── SKILLS STRIP ── */}
       {highlightedSkills.length > 0 && (
-        <div className="hp-skills-strip">
+        <div className="hp-skills-strip reveal-section">
           <div className="hp-skills-inner">
             <div className="hp-skills-title">Chuyên Môn Nổi Bật</div>
             <div className="hp-skills-tags">
@@ -413,11 +438,11 @@ function Home() {
       {pinnedProjects.length > 0 && (
         <div className="hp-projects">
           <div className="hp-projects-inner">
-            <div className="hp-section-label"><FiStar size={12} /> Dự Án Nổi Bật</div>
-            <div className="hp-section-title">Những Gì Tôi Đã Làm</div>
+            <div className="hp-section-label reveal-section"><FiStar size={12} /> Dự Án Nổi Bật</div>
+            <div className="hp-section-title reveal-section">Những Gì Tôi Đã Làm</div>
             <div className="hp-proj-grid">
               {pinnedProjects.map((project) => (
-                <div className="hp-proj-card" key={project.id}>
+                <div className="hp-proj-card reveal-section" key={project.id}>
                   <div className="hp-proj-accent" />
                   <div className="hp-proj-body">
                     <div className="hp-proj-pin-badge"><FiStar size={10} /> Được ghim</div>
@@ -438,7 +463,7 @@ function Home() {
                 </div>
               ))}
             </div>
-            <div className="hp-all-projects-wrap">
+            <div className="hp-all-projects-wrap reveal-section">
               <Link to="/projects" className="hp-btn-ghost">
                 Toàn bộ dự án <FiArrowRight size={14} />
               </Link>
@@ -449,7 +474,7 @@ function Home() {
 
       {/* ── GALLERY ── */}
       {gallery.length > 0 && (
-        <div className="hp-gallery">
+        <div className="hp-gallery reveal-section">
           <div className="hp-gallery-header">
             <h2>Thư Viện Hình Ảnh</h2>
             <p>Nhấp vào ảnh để xem kích thước đầy đủ</p>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPageContent } from '../utils/supabaseClient';
-import { FiArrowLeft, FiClock, FiLayers, FiPaperclip, FiDownload, FiMaximize2, FiX, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiArrowLeft, FiClock, FiLayers, FiPaperclip, FiDownload, FiMaximize2, FiX, FiChevronLeft, FiChevronRight, FiExternalLink } from 'react-icons/fi';
 
 function ProjectDetail() {
   const { slug } = useParams();
@@ -48,7 +48,7 @@ function ProjectDetail() {
         <FiArrowLeft /> Quay lại danh sách giải pháp
       </Link>
 
-      {/* SPLIT LAYOUT ĐẲNG CẤP TẠP CHÍ BA (Trái: Nội dung, Phải: Mục lục Sticky) */}
+      {/* SPLIT LAYOUT ĐẲNG CẤP TẠP CHÍ BA (Trái: Nội dung, Phải: Mục lục Sticky & Button Demo) */}
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '3rem', alignItems: 'start' }}>
         
         {/* CỘT TRÁI: KHÔNG GIAN SHOW NỘI DUNG CHI TIẾT */}
@@ -59,7 +59,7 @@ function ProjectDetail() {
               {project.duration && <span style={{ display:'flex', alignItems:'center', gap:'6px' }}><FiClock /> Vòng đời: {project.duration}</span>}
               <span style={{ display:'flex', alignItems:'center', gap:'6px' }}><FiLayers /> Phân mục kỹ thuật: {sections.length} khối nội dung</span>
             </div>
-            <p style={{ fontSize:'1.15rem', color:'#475569', lineHeight:'1.7', marginTop:'1.5rem', fontStyle:'italic' }}>{project.description}</p>
+            <div style={{ fontSize:'1.15rem', color:'#475569', lineHeight:'1.7', marginTop:'1.5rem' }} dangerouslySetInnerHTML={{ __html: project.description }} />
           </div>
 
           {/* VÒNG LẶP RENDER DYNAMIC COMPONENT BLOCK THEO LOẠI DỮ LIỆU */}
@@ -72,9 +72,7 @@ function ProjectDetail() {
 
                 {/* BLOCK 1: VĂN BẢN RICH TEXT (Dùng cho BRD, SRS) */}
                 {sec.type === 'text' && sec.textContent && (
-                  <p style={{ color: '#334155', fontSize: '1.1rem', lineHeight: '1.8', whiteSpace: 'pre-wrap', margin: 0 }}>
-                    {sec.textContent}
-                  </p>
+                  <div style={{ color: '#334155', fontSize: '1.1rem', lineHeight: '1.8', margin: 0 }} dangerouslySetInnerHTML={{ __html: sec.textContent }} />
                 )}
 
                 {/* BLOCK 2: SƠ ĐỒ HÌNH ẢNH KÈM CAPTION GHI CHÚ */}
@@ -87,9 +85,7 @@ function ProjectDetail() {
                           <div style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(15,23,42,0.8)', color: '#fff', padding: '0.4rem', borderRadius: '50%', display: 'flex' }}><FiMaximize2 size={16}/></div>
                         </div>
                         {img.caption && (
-                          <p style={{ margin: '1rem 0 0 0', color: '#475569', fontSize: '1rem', lineHeight: '1.6', borderLeft: '3px solid #2563eb', paddingLeft: '0.75rem', whiteSpace: 'pre-wrap' }}>
-                            {img.caption}
-                          </p>
+                          <div style={{ margin: '1rem 0 0 0', color: '#475569', fontSize: '1rem', lineHeight: '1.6', borderLeft: '3px solid #2563eb', paddingLeft: '0.75rem' }} dangerouslySetInnerHTML={{ __html: img.caption }} />
                         )}
                       </div>
                     ))}
@@ -161,29 +157,47 @@ function ProjectDetail() {
           </div>
         </div>
 
-        {/* CỘT PHẢI: THANH ĐIỀU HƯỚNG MỤC LỤC ĐỘNG STICKY PANEL */}
-        <div style={{ position: 'sticky', top: '100px', backgroundColor: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.01)' }}>
-          <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Mục lục cấu trúc</h4>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {sections.map((sec) => (
-              <li key={sec.id}>
-                <button 
-                  onClick={() => scrollToSection(sec.id)}
-                  style={{ 
-                    background: 'none', border: 'none', width: '100%', textAlign: 'left', 
-                    padding: '0.6rem 0.75rem', borderRadius: '6px', color: '#475569', 
-                    fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer',
-                    transition: 'all 0.2s', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis'
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#2563eb'; }}
-                  onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
-                >
-                  {sec.title}
-                </button>
-              </li>
-            ))}
-            {sections.length === 0 && <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Chưa thiết lập mục lục.</span>}
-          </ul>
+        {/* CỘT PHẢI: KHỐI LIÊN KẾT ĐỘNG (Sticky Right Panel) */}
+        <div style={{ position: 'sticky', top: '100px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          
+          {/* NÚT XEM DEMO TRỰC TIẾP */}
+          {project.demoUrl && (
+            <a 
+              href={project.demoUrl} 
+              target="_blank" 
+              rel="noreferrer" 
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#2563eb', color: '#fff', padding: '1rem', borderRadius: '12px', fontWeight: 800, textDecoration: 'none', boxShadow: '0 4px 15px rgba(37,99,235,0.3)', transition: 'transform 0.2s' }} 
+              onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} 
+              onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              <FiExternalLink size={20} /> Xem Demo Trực Tiếp
+            </a>
+          )}
+
+          {/* BẢNG MỤC LỤC */}
+          <div style={{ backgroundColor: '#ffffff', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.01)' }}>
+            <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Mục lục cấu trúc</h4>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {sections.map((sec) => (
+                <li key={sec.id}>
+                  <button 
+                    onClick={() => scrollToSection(sec.id)}
+                    style={{ 
+                      background: 'none', border: 'none', width: '100%', textAlign: 'left', 
+                      padding: '0.6rem 0.75rem', borderRadius: '6px', color: '#475569', 
+                      fontSize: '0.95rem', fontWeight: 500, cursor: 'pointer',
+                      transition: 'all 0.2s', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis'
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#2563eb'; }}
+                    onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                  >
+                    {sec.title}
+                  </button>
+                </li>
+              ))}
+              {sections.length === 0 && <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Chưa thiết lập mục lục.</span>}
+            </ul>
+          </div>
         </div>
 
       </div>
