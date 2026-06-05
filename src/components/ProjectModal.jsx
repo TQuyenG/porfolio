@@ -1,360 +1,814 @@
-import React, { useState } from 'react';
-import { FiX, FiCheck, FiPlus, FiArrowUp, FiArrowDown, FiTrash2, FiUploadCloud, FiPaperclip, FiStar, FiEdit } from 'react-icons/fi';
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  FiX, FiCheck, FiPlus, FiTrash2, FiUploadCloud, FiMove,
+  FiChevronUp, FiChevronDown, FiEdit3, FiEdit, FiImage,
+  FiVideo, FiType, FiGrid, FiPaperclip, FiBarChart2,
+  FiChevronRight, FiChevronsRight, FiAlertTriangle,
+  FiEye, FiEyeOff, FiLink, FiLayers
+} from 'react-icons/fi';
 import RichTextEditor from './RichTextEditor';
 import { uploadFileToStorage } from '../utils/supabaseClient';
 import ConfirmModal from './ConfirmModal';
-import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
 
-const ProjectModal = ({ mode, initialData, onClose, onSave, setNotification }) => {
-  const [project, setProject] = useState(initialData);
-  const [loading, setLoading] = useState(false);
-  
-  const [isDirty, setIsDirty, checkUnsavedChanges] = useUnsavedChangesWarning();
-  const [showConfirm, setShowConfirm] = useState(false);
+/* ─────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────── */
+const uid = () => `sec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-  const handleCancelClick = () => {
-    if (isDirty) setShowConfirm(true);
-    else onClose();
+const BLOCK_TYPES = [
+  { type: 'text',  icon: FiType,      label: 'Văn bản'   },
+  { type: 'image', icon: FiImage,     label: 'Hình ảnh'  },
+  { type: 'table', icon: FiGrid,      label: 'Bảng dữ liệu' },
+  { type: 'file',  icon: FiPaperclip, label: 'Tệp đính kèm' },
+  { type: 'chart', icon: FiBarChart2, label: 'Biểu đồ'   },
+];
+
+const emptySection = (type = 'text', parentId = null) => ({
+  id: uid(),
+  title: '',
+  type,
+  parentId,
+  textContent: '',
+  images: [],
+  files: [],
+  tableData: { headers: ['Cột 1', 'Cột 2', 'Cột 3'], rows: [['', '', '']] },
+  chartData: [{ label: 'Mục 1', value: 80 }],
+  chartType: 'bar',
+});
+
+/* ─────────────────────────────────────────
+   INLINE RICH TEXT với chèn ảnh / video
+───────────────────────────────────────── */
+function RichEditor({ value, onChange, onUploadImage }) {
+  const ref = useRef(null);
+  const fileRef = useRef(null);
+
+  const exec = (cmd, val = null) => {
+    document.execCommand(cmd, false, val);
+    ref.current?.focus();
+    onChange(ref.current?.innerHTML || '');
   };
 
-  const addSection = () => {
-    const newSection = { 
-      id: `sec-${Date.now()}`, title: 'Chương mục mới', type: 'text', 
-      textContent: '', tableData: { headers: ['Cột 1', 'Cột 2'], rows: [['', '']] }, files: [], images: [], chartType: 'bar', chartData: [{ label: 'Yêu cầu A', value: 70 }] 
-    };
-    setProject({ ...project, sections: [...(project.sections || []), newSection] });
-    setIsDirty(true);
+  const insertHtml = (html) => {
+    ref.current?.focus();
+    document.execCommand('insertHTML', false, html);
+    onChange(ref.current?.innerHTML || '');
   };
 
-  const updateSection = (sIdx, field, value) => {
-    const sections = [...project.sections];
-    sections[sIdx][field] = value;
-    setProject({ ...project, sections });
-    setIsDirty(true);
+  const handleImageUpload = async (file) => {
+    const res = await onUploadImage(file);
+    if (res?.url) {
+      insertHtml(`<img src="${res.url}" alt="" style="max-width:100%;border-radius:8px;margin:0.5rem 0;" />`);
+    }
   };
 
-  const moveSection = (sIdx, direction) => {
-    const sections = [...project.sections];
-    if (direction === 'up' && sIdx === 0) return;
-    if (direction === 'down' && sIdx === sections.length - 1) return;
-    const tgt = direction === 'up' ? sIdx - 1 : sIdx + 1;
-    [sections[sIdx], sections[tgt]] = [sections[tgt], sections[sIdx]];
-    setProject({ ...project, sections });
-    setIsDirty(true);
+  const handleVideoUrl = () => {
+    const url = window.prompt('Nhập URL video (YouTube embed hoặc link trực tiếp):');
+    if (!url) return;
+    const isYT = url.includes('youtube.com') || url.includes('youtu.be');
+    if (isYT) {
+      const id = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1];
+      if (id) {
+        insertHtml(`<div style="position:relative;padding-top:56.25%;margin:0.75rem 0;"><iframe src="https://www.youtube.com/embed/${id}" style="position:absolute;inset:0;width:100%;height:100%;border-radius:8px;border:none;" allowfullscreen></iframe></div>`);
+      }
+    } else {
+      insertHtml(`<video src="${url}" controls style="max-width:100%;border-radius:8px;margin:0.5rem 0;"></video>`);
+    }
   };
 
-  const deleteSection = (sIdx) => {
-    setProject({ ...project, sections: project.sections.filter((_, i) => i !== sIdx) });
-    setIsDirty(true);
-  };
-
-  const addTableColumn = (sIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].tableData.headers.push(`Cột ${sections[sIdx].tableData.headers.length + 1}`);
-    sections[sIdx].tableData.rows.forEach(r => r.push(''));
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-  
-  const addTableRow = (sIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].tableData.rows.push(new Array(sections[sIdx].tableData.headers.length).fill(''));
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-
-  const updateTableData = (sIdx, isHeader, rIdx, cIdx, val) => {
-    const sections = [...project.sections];
-    if (isHeader) sections[sIdx].tableData.headers[cIdx] = val;
-    else sections[sIdx].tableData.rows[rIdx][cIdx] = val;
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-
-  const deleteTableRow = (sIdx, rIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].tableData.rows.splice(rIdx, 1);
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  }
-
-  const deleteTableColumn = (sIdx, cIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].tableData.headers.splice(cIdx, 1);
-    sections[sIdx].tableData.rows.forEach(r => r.splice(cIdx, 1));
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  }
-
-  const addChartData = (sIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].chartData.push({ label: 'Thông số mới', value: 50 });
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-
-  const updateChartData = (sIdx, cIdx, field, val) => {
-    const sections = [...project.sections];
-    sections[sIdx].chartData[cIdx][field] = field === 'value' ? Number(val) : val;
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-
-  const deleteChartData = (sIdx, cIdx) => {
-    const sections = [...project.sections];
-    sections[sIdx].chartData.splice(cIdx, 1);
-    setProject({ ...project, sections });
-    setIsDirty(true);
-  };
-
-  const handleSubmit = () => {
-    if (!project.title.trim()) return setNotification({ open: true, type: 'error', title: 'Lỗi', message: 'Vui lòng nhập tên dự án.' });
-    setIsDirty(false); 
-    onSave(project);
-  };
+  const BTN = ({ onClick, title, children }) => (
+    <button type="button" title={title} onClick={onClick}
+      style={{ padding: '0.3rem 0.45rem', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', fontSize: '0.85rem' }}>
+      {children}
+    </button>
+  );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(5px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      
-      {/* 🚀 CSS ÉP GRID VÀ TỐI ƯU KHI MỞ TRÊN ĐIỆN THOẠI */}
-      <style>{`
-        .pm-container { background-color: #ffffff; border-radius: 16px; width: 100%; max-width: 1050px; height: 94vh; overflow-y: auto; padding: 2.5rem; box-shadow: 0 25px 50px rgba(0,0,0,0.2); }
-        .pm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .pm-grid-sec { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; width: 85%; }
-        .pm-grid-chart { display: grid; grid-template-columns: 2fr 1fr 50px; gap: 1rem; align-items: center; }
-        
-        @media (max-width: 768px) {
-          .pm-container { padding: 1.25rem; height: 98vh; }
-          .pm-grid-2 { grid-template-columns: 1fr; }
-          .pm-grid-sec { grid-template-columns: 1fr; width: 100%; }
-          .pm-grid-chart { grid-template-columns: 1fr 1fr 40px; }
-          .pm-btn-group { flex-direction: column; gap: 0.5rem; }
-          .pm-btn-group button { width: 100%; justify-content: center; }
-        }
-      `}</style>
+    <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: '3px', padding: '0.5rem 0.625rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', alignItems: 'center' }}>
+        <BTN onClick={() => exec('bold')} title="Đậm"><b>B</b></BTN>
+        <BTN onClick={() => exec('italic')} title="Nghiêng"><i>I</i></BTN>
+        <BTN onClick={() => exec('underline')} title="Gạch chân"><u>U</u></BTN>
+        <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 3px' }} />
+        <BTN onClick={() => exec('formatBlock', 'H3')} title="Tiêu đề lớn">H1</BTN>
+        <BTN onClick={() => exec('formatBlock', 'H4')} title="Tiêu đề nhỏ">H2</BTN>
+        <BTN onClick={() => exec('formatBlock', 'P')} title="Đoạn văn">P</BTN>
+        <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 3px' }} />
+        <BTN onClick={() => exec('insertUnorderedList')} title="Danh sách •">• –</BTN>
+        <BTN onClick={() => exec('insertOrderedList')} title="Danh sách số">1.</BTN>
+        <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 3px' }} />
+        {/* Chèn ảnh */}
+        <label title="Chèn ảnh" style={{ padding: '0.3rem 0.45rem', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center' }}>
+          <FiImage size={14} />
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files[0]) handleImageUpload(e.target.files[0]); e.target.value = ''; }} />
+        </label>
+        {/* Chèn video */}
+        <BTN onClick={handleVideoUrl} title="Chèn video"><FiVideo size={14} /></BTN>
+        {/* Chèn link */}
+        <BTN onClick={() => { const url = window.prompt('URL:'); if (url) exec('createLink', url); }} title="Chèn link"><FiLink size={14} /></BTN>
+      </div>
 
-      <div className="pm-container">
-        
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem', position: 'sticky', top: 0, backgroundColor: '#fff', zIndex: 10 }}>
-          <h3 style={{ margin: 0, fontSize: 'clamp(1.1rem, 3vw, 1.4rem)', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {mode === 'add' ? <><FiStar color="#f59e0b" /> Xây Dựng Hồ Sơ Mới</> : <><FiEdit color="#2563eb" /> Cấu Trúc Tài Liệu: {project.title}</>}
-          </h3>
-          <button onClick={handleCancelClick} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}><FiX /></button>
-        </div>
+      {/* Content area */}
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={e => onChange(e.currentTarget.innerHTML)}
+        dangerouslySetInnerHTML={{ __html: value }}
+        style={{ padding: '0.875rem 1rem', minHeight: '130px', outline: 'none', lineHeight: '1.75', fontSize: '0.9rem', color: '#374151' }}
+      />
+    </div>
+  );
+}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          <div className="form-group">
-            <label style={{ fontWeight: 700 }}>Tên tiêu đề hồ sơ</label>
-            <input type="text" value={project.title || ''} onChange={(e) => { setProject({ ...project, title: e.target.value }); setIsDirty(true); }} style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-          </div>
+/* ─────────────────────────────────────────
+   EXCEL-LIKE TABLE EDITOR
+───────────────────────────────────────── */
+function TableEditor({ tableData, onChange }) {
+  const { headers = [], rows = [] } = tableData;
 
-          <div className="pm-grid-2">
-            <div className="form-group">
-              <label style={{ fontWeight: 700 }}>Thời gian triển khai</label>
-              <input type="text" value={project.duration || ''} onChange={(e) => { setProject({ ...project, duration: e.target.value }); setIsDirty(true); }} placeholder="VD: T3/2026 - T5/2026" style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-            </div>
-            <div className="form-group">
-              <label style={{ fontWeight: 700 }}>Tags công nghệ (Cách nhau dấu phẩy)</label>
-              <input 
-                type="text" 
-                defaultValue={Array.isArray(project.technologies) ? project.technologies.join(', ') : ''} 
-                onBlur={(e) => { setProject({ ...project, technologies: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }); setIsDirty(true); }} 
-                placeholder="BPMN 2.0, Figma, React..." 
-                style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} 
-              />
-            </div>
-          </div>
-          
-          <div className="form-group">
-            <label style={{ fontWeight: 700 }}>Link Demo Dự Án (Live URL)</label>
-            <input type="text" value={project.demoUrl || ''} onChange={(e) => { setProject({ ...project, demoUrl: e.target.value }); setIsDirty(true); }} placeholder="https://github.com/..." style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-          </div>
+  const update = (newHeaders, newRows) => onChange({ headers: newHeaders, rows: newRows });
 
-          <div className="form-group">
-            <label style={{ fontWeight: 700 }}>Mô tả bài toán tổng quan</label>
-            <RichTextEditor value={project.description || ''} onChange={(val) => { setProject({ ...project, description: val }); setIsDirty(true); }} />
-          </div>
+  const addRow = () => update(headers, [...rows, headers.map(() => '')]);
+  const removeRow = (ri) => update(headers, rows.filter((_, i) => i !== ri));
+  const addCol = () => {
+    update(
+      [...headers, `Cột ${headers.length + 1}`],
+      rows.map(r => [...r, ''])
+    );
+  };
+  const removeCol = (ci) => {
+    update(headers.filter((_, i) => i !== ci), rows.map(r => r.filter((_, i) => i !== ci)));
+  };
+  const moveCol = (ci, dir) => {
+    const ni = ci + dir;
+    if (ni < 0 || ni >= headers.length) return;
+    const newH = [...headers];
+    [newH[ci], newH[ni]] = [newH[ni], newH[ci]];
+    const newR = rows.map(r => { const nr = [...r]; [nr[ci], nr[ni]] = [nr[ni], nr[ci]]; return nr; });
+    update(newH, newR);
+  };
+  const moveRow = (ri, dir) => {
+    const ni = ri + dir;
+    if (ni < 0 || ni >= rows.length) return;
+    const newR = [...rows];
+    [newR[ri], newR[ni]] = [newR[ni], newR[ri]];
+    update(headers, newR);
+  };
+  const updateHeader = (ci, val) => { const h = [...headers]; h[ci] = val; update(h, rows); };
+  const updateCell = (ri, ci, val) => {
+    const newR = rows.map((r, i) => i === ri ? r.map((c, j) => j === ci ? val : c) : r);
+    update(headers, newR);
+  };
 
-          <div style={{ borderTop: '2px dashed #cbd5e1', paddingTop: '1.5rem', marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '8px', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <h4 style={{ margin: 0, color: '#2563eb', fontWeight: 800, fontSize: '1.2rem' }}>Kiến trúc Mục lục (Table of Contents)</h4>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>Thêm các chương mục để thiết kế layout trang hồ sơ.</p>
-              </div>
-              <button 
-                type="button" 
-                onClick={addSection} 
-                style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                <FiPlus /> Thêm Mục Lục
-              </button>
-            </div>
+  const CELL_W = 140;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-              {(project.sections || []).map((sec, sIdx) => (
-                <div key={sec.id} style={{ padding: 'clamp(1rem, 3vw, 2rem)', border: '1px solid #cbd5e1', borderRadius: '12px', backgroundColor: '#f8fafc', position: 'relative', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                  
-                  <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', gap: '6px', backgroundColor: '#fff', padding: '0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <button type="button" onClick={() => moveSection(sIdx, 'up')} disabled={sIdx === 0} style={{ border:'none', background:'none', cursor:'pointer' }} title="Lên"><FiArrowUp size={16}/></button>
-                    <button type="button" onClick={() => moveSection(sIdx, 'down')} disabled={sIdx === project.sections.length - 1} style={{ border:'none', background:'none', cursor:'pointer' }} title="Xuống"><FiArrowDown size={16}/></button>
-                    <button type="button" onClick={() => deleteSection(sIdx)} style={{ color: '#ef4444', border:'none', background:'none', cursor:'pointer' }} title="Xóa Mục"><FiTrash2 size={16}/></button>
+  return (
+    <div>
+      <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: `${(headers.length + 1) * (CELL_W + 2)}px`, width: '100%' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f1f5f9' }}>
+              {/* Row control col */}
+              <th style={{ width: '36px', padding: '0.5rem', borderBottom: '2px solid #e2e8f0' }} />
+              {headers.map((h, ci) => (
+                <th key={ci} style={{ padding: '0.4rem 0.3rem', borderBottom: '2px solid #e2e8f0', minWidth: `${CELL_W}px` }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input
+                      value={h}
+                      onChange={e => updateHeader(ci, e.target.value)}
+                      style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #cbd5e1', borderRadius: '5px', fontSize: '0.8rem', fontWeight: 700, backgroundColor: '#fff', textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '2px' }}>
+                      <button type="button" onClick={() => moveCol(ci, -1)} disabled={ci === 0} title="Dịch trái" style={{ padding: '2px 4px', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '0.7rem', opacity: ci === 0 ? 0.3 : 1 }}>←</button>
+                      <button type="button" onClick={() => moveCol(ci, 1)} disabled={ci === headers.length - 1} title="Dịch phải" style={{ padding: '2px 4px', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '0.7rem', opacity: ci === headers.length - 1 ? 0.3 : 1 }}>→</button>
+                      <button type="button" onClick={() => removeCol(ci)} disabled={headers.length <= 1} title="Xóa cột" style={{ padding: '2px 4px', border: '1px solid #fecaca', borderRadius: '4px', background: '#fff', cursor: 'pointer', color: '#ef4444', fontSize: '0.7rem', opacity: headers.length <= 1 ? 0.3 : 1 }}>✕</button>
+                    </div>
                   </div>
-
-                  <div className="pm-grid-sec" style={{ marginBottom: '1.5rem' }}>
-                    <div className="form-group">
-                      <label style={{ fontSize:'0.9rem', fontWeight: 800, color: '#0f172a' }}>Tiêu đề mục</label>
-                      <input type="text" value={sec.title} onChange={(e) => updateSection(sIdx, 'title', e.target.value)} style={{ width:'100%', padding:'0.75rem', borderRadius:'6px', border:'1px solid #94a3b8', backgroundColor:'#fff', fontWeight: 600 }} />
-                    </div>
-                    <div className="form-group">
-                      <label style={{ fontSize:'0.9rem', fontWeight: 800, color:'#2563eb' }}>Hình thức Trình bày</label>
-                      <select value={sec.type} onChange={(e) => updateSection(sIdx, 'type', e.target.value)} style={{ width:'100%', padding:'0.75rem', borderRadius:'6px', border:'1px solid #94a3b8', backgroundColor:'#fff', fontWeight: 600, color: '#2563eb' }}>
-                        <option value="text">Văn bản Đặc tả (Rich-text)</option>
-                        <option value="image">Bộ sưu tập Sơ đồ / Ảnh</option>
-                        <option value="table">Bảng dữ liệu (Table Excel)</option>
-                        <option value="file">Tệp tài liệu đính kèm (PDF)</option>
-                        <option value="chart">Biểu đồ phân tích số liệu</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {sec.type === 'text' && (
-                    <div>
-                      <label style={{ fontSize:'0.85rem', fontWeight: 700, color: '#475569', marginBottom: '0.5rem', display: 'block' }}>Nội dung Đặc tả</label>
-                      <RichTextEditor value={sec.textContent || ''} onChange={(val) => updateSection(sIdx, 'textContent', val)} />
-                    </div>
-                  )}
-
-                  {sec.type === 'image' && (
-                    <div style={{ backgroundColor:'#fff', padding:'1.5rem', borderRadius:'8px', border:'1px solid #e2e8f0' }}>
-                      <label style={{ cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'8px', marginBottom:'1.5rem', backgroundColor: '#2563eb', color: '#ffffff', padding: '0.6rem 1.2rem', borderRadius: '8px', fontWeight: 600 }}>
-                        <FiUploadCloud /> Tải sơ đồ Flowchart/Hình ảnh lên {loading && '...'}
-                        <input type="file" accept="image/*" onChange={async(e)=>{ const file=e.target.files[0]; if(!file)return; setLoading(true); const res=await uploadFileToStorage(file,'assets'); setLoading(false); if(!res.error){ const curImg=sec.images || []; updateSection(sIdx, 'images', [...curImg, { url: res.url, caption: '' }]); }else{ setNotification({open:true, type:'error', title:'Lỗi ảnh', message:res.error.message}); } }} style={{ display:'none' }} disabled={loading}/>
-                      </label>
-                      <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
-                        {(sec.images || []).map((img, imgIdx) => (
-                          <div key={imgIdx} style={{ display:'flex', flexWrap: 'wrap', gap:'1.5rem', alignItems:'center', border:'1px solid #cbd5e1', padding:'1rem', borderRadius: '8px', backgroundColor: '#f8fafc' }}>
-                            <img src={img.url} alt="block" style={{ width:'120px', height:'120px', objectFit:'cover', borderRadius:'6px', border: '1px solid #94a3b8' }} />
-                            <div style={{ flex: '1 1 200px' }}>
-                              <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Caption / Giải thích sơ đồ:</label>
-                              <RichTextEditor value={img.caption || ''} onChange={(val)=>{ const copy=[...sec.images]; copy[imgIdx].caption=val; updateSection(sIdx, 'images', copy); }} />
-                            </div>
-                            <button type="button" onClick={()=>{ const copy=sec.images.filter((_,i)=>i!==imgIdx); updateSection(sIdx, 'images', copy); }} style={{ backgroundColor: '#fef2f2', color:'#ef4444', border: '1px solid #fca5a5', padding: '0.6rem', borderRadius: '6px', cursor: 'pointer', display: 'flex' }}><FiTrash2 size={18}/></button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {sec.type === 'table' && sec.tableData && (
-                    <div style={{ backgroundColor:'#fff', padding:'1.5rem', borderRadius:'8px', border:'1px solid #e2e8f0', overflowX: 'auto' }}>
-                      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                        <button type="button" onClick={() => addTableColumn(sIdx)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><FiPlus /> Thêm Cột</button>
-                        <button type="button" onClick={() => addTableRow(sIdx)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><FiPlus /> Thêm Hàng</button>
-                      </div>
-                      
-                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-                        <thead>
-                          <tr>
-                            {sec.tableData.headers.map((h, cIdx) => (
-                              <th key={cIdx} style={{ padding: '0.5rem', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', position: 'relative' }}>
-                                <input type="text" value={h} onChange={(e) => updateTableData(sIdx, true, 0, cIdx, e.target.value)} style={{ width: '85%', padding: '0.4rem', fontWeight: 'bold', border: 'none', background: 'transparent' }} placeholder={`Tiêu đề cột ${cIdx+1}`}/>
-                                {sec.tableData.headers.length > 1 && <button type="button" onClick={() => deleteTableColumn(sIdx, cIdx)} style={{ position: 'absolute', right: '4px', top: '8px', color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}
-                              </th>
-                            ))}
-                            <th style={{ width: '50px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1' }}></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sec.tableData.rows.map((row, rIdx) => (
-                            <tr key={rIdx}>
-                              {row.map((cell, cIdx) => (
-                                <td key={cIdx} style={{ padding: '0.5rem', border: '1px solid #cbd5e1' }}>
-                                  <input type="text" value={cell} onChange={(e) => updateTableData(sIdx, false, rIdx, cIdx, e.target.value)} style={{ width: '100%', padding: '0.4rem', border: 'none', outline: 'none' }} placeholder="Nhập dữ liệu..."/>
-                                </td>
-                              ))}
-                              <td style={{ textAlign: 'center', border: '1px solid #cbd5e1' }}>
-                                {sec.tableData.rows.length > 1 && <button type="button" onClick={() => deleteTableRow(sIdx, rIdx)} style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {sec.type === 'file' && (
-                    <div style={{ backgroundColor:'#fff', padding:'1.5rem', borderRadius:'8px', border:'1px solid #e2e8f0' }}>
-                      <label style={{ cursor:'pointer', display:'inline-flex', alignItems:'center', gap:'8px', marginBottom:'1.5rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '0.6rem 1.2rem', borderRadius: '8px', fontWeight: 600 }}>
-                        <FiPaperclip /> Đính kèm Tệp (PDF) <input type="file" accept=".pdf" onChange={async(e)=>{ const file=e.target.files[0]; if(!file)return; setLoading(true); const res=await uploadFileToStorage(file,'documents'); setLoading(false); if(!res.error){ const curFiles=sec.files || []; updateSection(sIdx, 'files', [...curFiles, { name: file.name, url: res.url }]); } }} style={{ display:'none' }} disabled={loading} />
-                      </label>
-                      <div style={{ display:'flex', flexDirection:'column', gap:'0.8rem' }}>
-                        {(sec.files || []).map((file, fIdx) => (
-                          <div key={fIdx} style={{ display:'flex', justifyContent:'space-between', alignItems: 'center', backgroundColor:'#f1f5f9', padding:'1rem', borderRadius:'6px', border: '1px solid #cbd5e1', flexWrap: 'wrap', gap: '1rem' }}>
-                            <span style={{ fontWeight: 600, color: '#1e293b' }}>📄 {file.name}</span>
-                            <button type="button" onClick={()=>{ const copy=sec.files.filter((_,i)=>i!==fIdx); updateSection(sIdx, 'files', copy); }} style={{ backgroundColor: '#fef2f2', color:'#ef4444', border: '1px solid #fca5a5', padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}><FiTrash2 /> Xóa tệp</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {sec.type === 'chart' && (
-                    <div style={{ backgroundColor:'#fff', padding:'1.5rem', borderRadius:'8px', border:'1px solid #e2e8f0' }}>
-                      <div style={{ display:'flex', gap:'1rem', alignItems:'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                        <strong style={{ color: '#0f172a' }}>Chọn loại đồ thị:</strong>
-                        <select value={sec.chartType || 'bar'} onChange={(e)=>updateSection(sIdx, 'chartType', e.target.value)} style={{ padding:'0.5rem 1rem', borderRadius:'6px', border: '1px solid #cbd5e1', fontWeight: 600 }}>
-                          <option value="bar">Biểu đồ Cột (Thanh ngang Bar Chart)</option>
-                          <option value="line">Biểu đồ Tiến độ (Màu xanh lá)</option>
-                        </select>
-                      </div>
-                      
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div className="pm-grid-chart" style={{ fontWeight: 700, color: '#475569', paddingBottom: '0.5rem', borderBottom: '1px solid #cbd5e1' }}>
-                          <span>Tên Thông Số / Trục Y</span>
-                          <span>Giá trị %</span>
-                          <span>Xóa</span>
-                        </div>
-                        {(sec.chartData || []).map((cItem, cIdx) => (
-                          <div key={cIdx} className="pm-grid-chart">
-                            <input type="text" value={cItem.label} onChange={(e) => updateChartData(sIdx, cIdx, 'label', e.target.value)} style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} placeholder="Nhập tên..." />
-                            <input type="number" value={cItem.value} onChange={(e) => updateChartData(sIdx, cIdx, 'value', e.target.value)} max="100" min="0" style={{ padding: '0.6rem', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-                            <button type="button" onClick={() => deleteChartData(sIdx, cIdx)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => addChartData(sIdx)} style={{ marginTop: '1rem', width: 'max-content', padding: '0.6rem 1.2rem', backgroundColor: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}><FiPlus /> Thêm Dữ Liệu</button>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
+                </th>
               ))}
-            </div>
-          </div>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
+                {/* Row controls */}
+                <td style={{ padding: '0.3rem', borderRight: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                    <button type="button" onClick={() => moveRow(ri, -1)} disabled={ri === 0} title="Lên" style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.65rem', opacity: ri === 0 ? 0.3 : 1 }}>↑</button>
+                    <button type="button" onClick={() => moveRow(ri, 1)} disabled={ri === rows.length - 1} title="Xuống" style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.65rem', opacity: ri === rows.length - 1 ? 0.3 : 1 }}>↓</button>
+                    <button type="button" onClick={() => removeRow(ri)} disabled={rows.length <= 1} title="Xóa hàng" style={{ padding: '1px 4px', border: '1px solid #fecaca', borderRadius: '3px', background: '#fff', cursor: 'pointer', color: '#ef4444', fontSize: '0.65rem', opacity: rows.length <= 1 ? 0.3 : 1 }}>✕</button>
+                  </div>
+                </td>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={{ padding: '0.3rem', verticalAlign: 'top' }}>
+                    <textarea
+                      value={cell}
+                      onChange={e => updateCell(ri, ci, e.target.value)}
+                      rows={2}
+                      style={{ width: '100%', padding: '0.4rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '0.82rem', resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box', minHeight: '54px' }}
+                      onFocus={e => e.target.style.borderColor = '#93c5fd'}
+                      onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+        <button type="button" onClick={addRow}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.875rem', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+          <FiPlus size={13} /> Thêm hàng
+        </button>
+        <button type="button" onClick={addCol}
+          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '0.4rem 0.875rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+          <FiPlus size={13} /> Thêm cột
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   SECTION EDITOR
+───────────────────────────────────────── */
+function SectionEditor({ sec, index, total, onUpdate, onRemove, onMove, onAddChild, setNotification }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const isChild = !!sec.parentId;
+
+  const upd = (patch) => onUpdate({ ...sec, ...patch });
+
+  const handleImageUpload = async (file) => {
+    const res = await uploadFileToStorage(file, 'assets');
+    if (res.error) { setNotification({ open: true, type: 'error', title: 'Lỗi', message: res.error.message }); return null; }
+    return res;
+  };
+
+  const addImage = async (file) => {
+    const res = await handleImageUpload(file);
+    if (res?.url) upd({ images: [...(sec.images || []), { url: res.url, caption: '' }] });
+  };
+
+  const addFile = async (file) => {
+    const res = await handleImageUpload(file);
+    if (res?.url) upd({ files: [...(sec.files || []), { url: res.url, name: file.name }] });
+  };
+
+  const TypeIcon = BLOCK_TYPES.find(b => b.type === sec.type)?.icon || FiType;
+
+  return (
+    <div style={{
+      border: '1.5px solid',
+      borderColor: isChild ? '#dbeafe' : '#e2e8f0',
+      borderRadius: '12px',
+      backgroundColor: isChild ? '#f8fbff' : '#fff',
+      marginLeft: isChild ? '1.5rem' : '0',
+      overflow: 'hidden',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: isChild ? '#eff6ff' : '#f8fafc', borderBottom: collapsed ? 'none' : '1px solid #f1f5f9', cursor: 'pointer' }}
+        onClick={() => setCollapsed(v => !v)}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', backgroundColor: isChild ? '#dbeafe' : '#e2e8f0', borderRadius: '6px', flexShrink: 0, color: '#2563eb' }}>
+          <TypeIcon size={14} />
         </div>
 
-        <div className="pm-btn-group" style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', position: 'sticky', bottom: '-20px', backgroundColor: '#fff', zIndex: 10 }}>
-          <button 
-            type="button"
-            onClick={handleCancelClick} 
-            style={{ padding: '0.8rem 2rem', backgroundColor: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          >
-            Hủy Bỏ
+        <span style={{ flex: 1, fontSize: '0.875rem', fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {sec.title || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa đặt tiêu đề</span>}
+        </span>
+
+        <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+          {!isChild && (
+            <button type="button" onClick={() => onAddChild(sec.id)} title="Thêm mục con"
+              style={{ padding: '4px 6px', border: '1px solid #bfdbfe', borderRadius: '5px', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <FiChevronsRight size={11} /> Con
+            </button>
+          )}
+          <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} title="Lên"
+            style={{ padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', color: '#475569', cursor: 'pointer', opacity: index === 0 ? 0.3 : 1 }}>
+            <FiChevronUp size={13} />
           </button>
-          <button 
-            type="button"
-            onClick={handleSubmit} 
-            style={{ padding: '0.8rem 3rem', fontSize: '1.1rem', backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            <FiCheck /> Hoàn Tất Lưu Hồ Sơ
+          <button type="button" onClick={() => onMove(index, 1)} disabled={index >= total - 1} title="Xuống"
+            style={{ padding: '4px 6px', border: '1px solid #e2e8f0', borderRadius: '5px', background: '#fff', color: '#475569', cursor: 'pointer', opacity: index >= total - 1 ? 0.3 : 1 }}>
+            <FiChevronDown size={13} />
           </button>
+          <button type="button" onClick={() => onRemove(sec.id)} title="Xóa"
+            style={{ padding: '4px 6px', border: '1px solid #fecaca', borderRadius: '5px', background: '#fff', color: '#ef4444', cursor: 'pointer' }}>
+            <FiTrash2 size={13} />
+          </button>
+          <div style={{ padding: '4px 5px', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+            {collapsed ? <FiChevronDown size={14} /> : <FiChevronUp size={14} />}
+          </div>
         </div>
       </div>
 
-      <ConfirmModal 
+      {/* Body */}
+      {!collapsed && (
+        <div style={{ padding: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.75rem', marginBottom: '0.875rem', alignItems: 'start' }}>
+            {/* Tiêu đề */}
+            <input
+              type="text"
+              placeholder="Tiêu đề mục..."
+              value={sec.title}
+              onChange={e => upd({ title: e.target.value })}
+              style={{ padding: '0.6rem 0.875rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, outline: 'none', width: '100%', boxSizing: 'border-box' }}
+              onFocus={e => e.target.style.borderColor = '#93c5fd'}
+              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+            />
+            {/* Loại block */}
+            <select
+              value={sec.type}
+              onChange={e => upd({ type: e.target.value })}
+              style={{ padding: '0.6rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, color: '#374151', backgroundColor: '#f8fafc', outline: 'none', cursor: 'pointer' }}
+            >
+              {BLOCK_TYPES.map(b => <option key={b.type} value={b.type}>{b.label}</option>)}
+            </select>
+          </div>
+
+          {/* ── TEXT ── */}
+          {sec.type === 'text' && (
+            <RichEditor
+              value={sec.textContent || ''}
+              onChange={val => upd({ textContent: val })}
+              onUploadImage={handleImageUpload}
+            />
+          )}
+
+          {/* ── IMAGE ── */}
+          {sec.type === 'image' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              {(sec.images || []).map((img, idx) => (
+                <div key={idx} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
+                  <div style={{ position: 'relative' }}>
+                    <img src={img.url} alt="" style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', display: 'block', backgroundColor: '#f0f4f8' }} />
+                    <button type="button" onClick={() => upd({ images: sec.images.filter((_, i) => i !== idx) })}
+                      style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239,68,68,0.9)', border: 'none', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FiX size={13} />
+                    </button>
+                  </div>
+                  <div style={{ padding: '0.625rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Ghi chú / caption ảnh..."
+                      value={img.caption || ''}
+                      onChange={e => { const imgs = [...sec.images]; imgs[idx] = { ...img, caption: e.target.value }; upd({ images: imgs }); }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.25rem', backgroundColor: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '10px', cursor: 'pointer', color: '#475569', fontSize: '0.85rem', fontWeight: 700, justifyContent: 'center' }}>
+                <FiUploadCloud size={16} color="#2563eb" /> Tải ảnh lên
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={async e => { for (const f of Array.from(e.target.files)) await addImage(f); e.target.value = ''; }} />
+              </label>
+            </div>
+          )}
+
+          {/* ── TABLE ── */}
+          {sec.type === 'table' && (
+            <TableEditor tableData={sec.tableData || { headers: [], rows: [] }} onChange={tableData => upd({ tableData })} />
+          )}
+
+          {/* ── FILE ── */}
+          {sec.type === 'file' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              {(sec.files || []).map((file, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.625rem 1rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FiPaperclip size={13} color="#2563eb" /> {file.name}
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={file.name}
+                      onChange={e => { const files = [...sec.files]; files[idx] = { ...file, name: e.target.value }; upd({ files }); }}
+                      placeholder="Tên hiển thị"
+                      style={{ padding: '0.3rem 0.6rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.8rem', outline: 'none', width: '160px' }}
+                    />
+                    <button type="button" onClick={() => upd({ files: sec.files.filter((_, i) => i !== idx) })}
+                      style={{ padding: '4px 8px', border: '1px solid #fecaca', borderRadius: '6px', background: '#fff', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <FiTrash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0.75rem 1.25rem', backgroundColor: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '10px', cursor: 'pointer', color: '#475569', fontSize: '0.85rem', fontWeight: 700, justifyContent: 'center' }}>
+                <FiUploadCloud size={16} color="#2563eb" /> Tải tệp lên
+                <input type="file" multiple style={{ display: 'none' }} onChange={async e => { for (const f of Array.from(e.target.files)) await addFile(f); e.target.value = ''; }} />
+              </label>
+            </div>
+          )}
+
+          {/* ── CHART ── */}
+          {sec.type === 'chart' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>Loại biểu đồ:</label>
+                <select value={sec.chartType || 'bar'} onChange={e => upd({ chartType: e.target.value })}
+                  style={{ padding: '0.4rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '0.82rem', fontWeight: 700, outline: 'none', backgroundColor: '#f8fafc' }}>
+                  <option value="bar">Cột (Bar)</option>
+                  <option value="line">Đường (Line)</option>
+                </select>
+              </div>
+              {(sec.chartData || []).map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Nhãn"
+                    value={item.label}
+                    onChange={e => { const d = [...sec.chartData]; d[idx] = { ...item, label: e.target.value }; upd({ chartData: d }); }}
+                    style={{ flex: 1, padding: '0.5rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '0.82rem', outline: 'none' }}
+                  />
+                  <input
+                    type="number"
+                    min="0" max="100"
+                    placeholder="%"
+                    value={item.value}
+                    onChange={e => { const d = [...sec.chartData]; d[idx] = { ...item, value: Number(e.target.value) }; upd({ chartData: d }); }}
+                    style={{ width: '80px', padding: '0.5rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '0.82rem', outline: 'none', textAlign: 'center' }}
+                  />
+                  <button type="button" onClick={() => upd({ chartData: sec.chartData.filter((_, i) => i !== idx) })}
+                    style={{ padding: '6px 8px', border: '1px solid #fecaca', borderRadius: '7px', background: '#fff', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <FiTrash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <button type="button"
+                onClick={() => upd({ chartData: [...(sec.chartData || []), { label: `Mục ${(sec.chartData || []).length + 1}`, value: 50 }] })}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.5rem 1rem', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', width: 'fit-content' }}>
+                <FiPlus size={13} /> Thêm mục
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   MAIN MODAL
+───────────────────────────────────────── */
+const ProjectModal = ({ mode, initialData, onClose, onSave, setNotification }) => {
+  const [project, setProject] = useState(() => ({
+    title: '', slug: '', category: '', client: '', duration: '',
+    metric: '', demoUrl: '', coverImage: '', description: '',
+    technologies: [], isPinned: false, isHidden: false,
+    sections: [],
+    ...initialData,
+  }));
+  const [isDirty, setIsDirty] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic'); // 'basic' | 'sections'
+  const [techInput, setTechInput] = useState('');
+
+  const upd = (patch) => { setProject(p => ({ ...p, ...patch })); setIsDirty(true); };
+
+  /* Auto generate slug from title */
+  const handleTitleChange = (val) => {
+    const slug = val.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+    upd({ title: val, slug: project.slug || slug });
+  };
+
+  /* Technologies tags */
+  const addTech = () => {
+    const t = techInput.trim();
+    if (t && !(project.technologies || []).includes(t)) {
+      upd({ technologies: [...(project.technologies || []), t] });
+    }
+    setTechInput('');
+  };
+  const removeTech = (t) => upd({ technologies: project.technologies.filter(x => x !== t) });
+
+  /* Section management */
+  const flatSections = project.sections || [];
+
+  const addSection = (type = 'text', parentId = null) => {
+    const sec = emptySection(type, parentId);
+    upd({ sections: [...flatSections, sec] });
+  };
+
+  const updateSection = (updated) => {
+    upd({ sections: flatSections.map(s => s.id === updated.id ? updated : s) });
+  };
+
+  const removeSection = (id) => {
+    upd({ sections: flatSections.filter(s => s.id !== id && s.parentId !== id) });
+  };
+
+  const moveSection = (index, dir) => {
+    const roots = flatSections.filter(s => !s.parentId);
+    const ni = index + dir;
+    if (ni < 0 || ni >= roots.length) return;
+    const newRoots = [...roots];
+    [newRoots[index], newRoots[ni]] = [newRoots[ni], newRoots[index]];
+    const children = flatSections.filter(s => s.parentId);
+    upd({ sections: [...newRoots, ...children] });
+  };
+
+  const handleUploadCover = async (file) => {
+    setUploading(true);
+    const res = await uploadFileToStorage(file, 'assets');
+    setUploading(false);
+    if (res.error) { setNotification({ open: true, type: 'error', title: 'Lỗi', message: res.error.message }); return; }
+    upd({ coverImage: res.url });
+  };
+
+  const handleSave = () => {
+    if (!project.title.trim()) {
+      setNotification({ open: true, type: 'error', title: 'Thiếu thông tin', message: 'Vui lòng nhập tên dự án.' });
+      return;
+    }
+    if (!project.slug.trim()) {
+      setNotification({ open: true, type: 'error', title: 'Thiếu thông tin', message: 'Vui lòng nhập slug dự án.' });
+      return;
+    }
+    setIsDirty(false);
+    onSave(project);
+  };
+
+  const handleClose = () => { if (isDirty) setShowConfirm(true); else onClose(); };
+
+  /* Roots & children */
+  const roots = flatSections.filter(s => !s.parentId);
+
+  const TABS = [
+    { id: 'basic', label: 'Thông tin chung' },
+    { id: 'sections', label: `Nội dung (${flatSections.length})` },
+  ];
+
+  const INPUT_STYLE = {
+    width: '100%', padding: '0.65rem 0.875rem', border: '1.5px solid #e2e8f0', borderRadius: '8px',
+    fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s',
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.82)', backdropFilter: 'blur(6px)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
+      <style>{`
+        .pm-wrap { background:#fff; border-radius:16px; width:100%; max-width:900px; max-height:95vh; display:flex; flex-direction:column; box-shadow:0 30px 60px rgba(0,0,0,0.25); }
+        .pm-body { flex:1; overflow-y:auto; padding:1.5rem; }
+        .pm-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0.875rem; }
+        .pm-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.875rem; }
+        .pm-label { display:block; font-size:0.78rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.35rem; }
+        .pm-input:focus { border-color:#93c5fd !important; box-shadow:0 0 0 3px rgba(37,99,235,0.08); }
+        @media (max-width:640px) {
+          .pm-wrap { max-height:100vh; border-radius:12px; }
+          .pm-grid-2, .pm-grid-3 { grid-template-columns:1fr; }
+          .pm-body { padding:1rem; }
+        }
+      `}</style>
+
+      <div className="pm-wrap">
+        {/* ── HEADER ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.125rem 1.5rem', borderBottom: '1px solid #f1f5f9', flexShrink: 0, gap: '0.75rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {mode === 'add' ? <><FiEdit3 size={18} color="#2563eb" /> Thêm dự án mới</> : <><FiEdit size={18} color="#10b981" /> Chỉnh sửa dự án</>}
+          </h3>
+          <button onClick={handleClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <FiX size={22} />
+          </button>
+        </div>
+
+        {/* ── TABS ── */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9', backgroundColor: '#f8fafc', flexShrink: 0 }}>
+          {TABS.map(tab => (
+            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '0.75rem 1.25rem', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '0.875rem', fontWeight: activeTab === tab.id ? 800 : 600,
+                color: activeTab === tab.id ? '#2563eb' : '#64748b',
+                borderBottom: activeTab === tab.id ? '2.5px solid #2563eb' : '2.5px solid transparent',
+                transition: 'all 0.2s',
+              }}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── BODY ── */}
+        <div className="pm-body">
+
+          {/* ════ TAB: THÔNG TIN CHUNG ════ */}
+          {activeTab === 'basic' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              {/* Tên + Slug */}
+              <div className="pm-grid-2">
+                <div>
+                  <label className="pm-label">Tên dự án *</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="Tên dự án..." value={project.title} onChange={e => handleTitleChange(e.target.value)} />
+                </div>
+                <div>
+                  <label className="pm-label">Slug (URL) *</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="ten-du-an" value={project.slug} onChange={e => upd({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
+                </div>
+              </div>
+
+              {/* Category + Client */}
+              <div className="pm-grid-2">
+                <div>
+                  <label className="pm-label">Ngành nghề (Category)</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="FINTECH, HEALTHCARE..." value={project.category || ''} onChange={e => upd({ category: e.target.value })} />
+                </div>
+                <div>
+                  <label className="pm-label">Khách hàng (Client)</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="Tên khách hàng / công ty" value={project.client || ''} onChange={e => upd({ client: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Duration + Metric + Demo */}
+              <div className="pm-grid-3">
+                <div>
+                  <label className="pm-label">Thời gian triển khai</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="Q1/2024 – Q3/2024" value={project.duration || ''} onChange={e => upd({ duration: e.target.value })} />
+                </div>
+                <div>
+                  <label className="pm-label">Chỉ số nổi bật (Metric)</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="text" placeholder="98.5% Uptime, -40% Bug..." value={project.metric || ''} onChange={e => upd({ metric: e.target.value })} />
+                </div>
+                <div>
+                  <label className="pm-label">Link Demo</label>
+                  <input className="pm-input" style={INPUT_STYLE} type="url" placeholder="https://..." value={project.demoUrl || ''} onChange={e => upd({ demoUrl: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Mô tả */}
+              <div>
+                <label className="pm-label">Mô tả ngắn (hiển thị trên card)</label>
+                <RichEditor
+                  value={project.description || ''}
+                  onChange={val => upd({ description: val })}
+                  onUploadImage={async (file) => { const res = await uploadFileToStorage(file, 'assets'); return res; }}
+                />
+              </div>
+
+              {/* Technologies */}
+              <div>
+                <label className="pm-label">Công nghệ & Công cụ</label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.625rem' }}>
+                  <input
+                    style={{ ...INPUT_STYLE, flex: 1 }}
+                    type="text"
+                    placeholder="Nhập công nghệ rồi Enter (VD: Figma, SQL...)"
+                    value={techInput}
+                    onChange={e => setTechInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTech(); } }}
+                  />
+                  <button type="button" onClick={addTech}
+                    style={{ padding: '0.65rem 1rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
+                    <FiPlus size={15} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {(project.technologies || []).map(t => (
+                    <span key={t} style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.25rem 0.625rem', fontSize: '0.78rem', fontWeight: 700 }}>
+                      {t}
+                      <button type="button" onClick={() => removeTech(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', padding: 0, display: 'flex', alignItems: 'center' }}>
+                        <FiX size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ảnh bìa */}
+              <div>
+                <label className="pm-label">Ảnh bìa dự án</label>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1.5px dashed #cbd5e1', flexWrap: 'wrap' }}>
+                  {project.coverImage && (
+                    <div style={{ position: 'relative' }}>
+                      <img src={project.coverImage} alt="" style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <button type="button" onClick={() => upd({ coverImage: '' })}
+                        style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ef4444', border: 'none', color: '#fff', width: '20px', height: '20px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FiX size={11} />
+                      </button>
+                    </div>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '0.6rem 1.125rem', backgroundColor: '#fff', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700 }}>
+                    <FiUploadCloud size={15} color="#2563eb" /> {uploading ? 'Đang tải...' : 'Chọn ảnh'}
+                    <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={e => { if (e.target.files[0]) handleUploadCover(e.target.files[0]); e.target.value = ''; }} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Flags */}
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'isPinned', label: 'Ghim nổi bật', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
+                  { key: 'isHidden', label: 'Ẩn dự án', color: '#64748b', bg: '#f1f5f9', border: '#e2e8f0' },
+                ].map(({ key, label, color, bg, border }) => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                    <div
+                      onClick={() => upd({ [key]: !project[key] })}
+                      style={{
+                        width: '40px', height: '22px', borderRadius: '11px', position: 'relative', transition: 'background 0.2s',
+                        backgroundColor: project[key] ? color : '#cbd5e1', cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: '3px', left: project[key] ? '21px' : '3px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                    </div>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: project[key] ? color : '#94a3b8' }}>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ════ TAB: NỘI DUNG / MỤC LỤC ════ */}
+          {activeTab === 'sections' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+              {/* Add buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', padding: '0.875rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', alignSelf: 'center', marginRight: '0.25rem' }}>Thêm mục:</span>
+                {BLOCK_TYPES.map(({ type, icon: Icon, label }) => (
+                  <button key={type} type="button" onClick={() => addSection(type)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.4rem 0.75rem', backgroundColor: '#fff', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+                    onMouseOver={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.color = '#2563eb'; }}
+                    onMouseOut={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151'; }}>
+                    <Icon size={12} /> {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Section list */}
+              {roots.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1.5px dashed #e2e8f0' }}>
+                  <FiLayers size={28} style={{ marginBottom: '0.75rem', opacity: 0.4 }} />
+                  <p style={{ fontSize: '0.9rem', margin: 0 }}>Chưa có mục nào. Nhấn nút bên trên để thêm.</p>
+                </div>
+              )}
+
+              {roots.map((sec, idx) => {
+                const children = flatSections.filter(s => s.parentId === sec.id);
+                return (
+                  <div key={sec.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                    <SectionEditor
+                      sec={sec}
+                      index={idx}
+                      total={roots.length}
+                      onUpdate={updateSection}
+                      onRemove={removeSection}
+                      onMove={moveSection}
+                      onAddChild={(parentId) => addSection('text', parentId)}
+                      setNotification={setNotification}
+                    />
+                    {/* Children */}
+                    {children.map((child, ci) => (
+                      <SectionEditor
+                        key={child.id}
+                        sec={child}
+                        index={ci}
+                        total={children.length}
+                        onUpdate={updateSection}
+                        onRemove={removeSection}
+                        onMove={(i, dir) => {
+                          const ni = i + dir;
+                          if (ni < 0 || ni >= children.length) return;
+                          const newChildren = [...children];
+                          [newChildren[i], newChildren[ni]] = [newChildren[ni], newChildren[i]];
+                          const others = flatSections.filter(s => s.parentId !== sec.id && !s.parentId);
+                          upd({ sections: [...others, ...newChildren].flat() });
+                        }}
+                        onAddChild={() => {}}
+                        setNotification={setNotification}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── FOOTER ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', flexShrink: 0, gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+            {flatSections.length} mục nội dung • {isDirty && <span style={{ color: '#f59e0b', fontWeight: 700 }}>Chưa lưu</span>}
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button type="button" onClick={handleClose}
+              style={{ padding: '0.65rem 1.5rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '9px', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem' }}>
+              Hủy
+            </button>
+            <button type="button" onClick={handleSave}
+              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '0.65rem 2rem', backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '9px', fontWeight: 800, cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 4px 12px rgba(16,185,129,0.25)' }}>
+              <FiCheck size={16} /> Lưu dự án
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ConfirmModal
         open={showConfirm}
         title="Dữ liệu chưa được lưu!"
-        message="Bạn đang chỉnh sửa dở dang. Nếu thoát ra, các thay đổi sẽ bị xóa bỏ hoàn toàn. Bạn có chắc chắn muốn thoát?"
+        message="Bạn đang chỉnh sửa dự án. Nếu thoát ra bây giờ, tất cả thay đổi sẽ bị mất."
         onConfirm={onClose}
         onCancel={() => setShowConfirm(false)}
         confirmText="Vẫn thoát"
