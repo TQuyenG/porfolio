@@ -3,7 +3,6 @@
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--bg-surface);
-  overflow-x: hidden;
 }
 
 .main-content {
@@ -31,7 +30,7 @@
 }
 
 .btn-primary {
-  background-color: var(--primary-color);
+  background-color: var(--primary);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
 }

@@ -129,7 +129,7 @@ export default function Home() {
   const prevImage = (e) => { e.stopPropagation(); setLightboxIndex(p => (p === 0 ? gallery.length - 1 : p - 1)); };
 
   return (
-    <section className="page home-page hp-root" style={{ padding: 0, overflowX: 'hidden' }}>
+    <section className="page home-page hp-root" style={{ padding: 0 }}>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:ital,wght@0,700;0,900;1,700;1,900&display=swap');
