@@ -370,7 +370,7 @@ export default function Private() {
 
   /* ════════ ADMIN LAYOUT ════════ */
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'flex-start', backgroundColor: '#f1f5f9', position: 'relative' }}>
       <style>{`
         /* ── Sidebar ── */
         .adm-sidebar {
@@ -382,6 +382,9 @@ export default function Private() {
           overflow: hidden;
           z-index: 200;
           transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+          position: sticky;
+          top: 0;
+          height: 100vh;
         }
         .adm-sidebar-inner {
           flex: 1;
@@ -394,7 +397,6 @@ export default function Private() {
         /* ── Main scroll area ── */
         .adm-main {
           flex: 1;
-          overflow-y: auto;
           min-width: 0;
         }
 
@@ -575,7 +577,7 @@ export default function Private() {
       ══════════════════════════════════ */}
       <div className="adm-main">
         {/* ── Top bar ── */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', padding: '0.875rem 1.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ position: 'sticky', top: '70px', zIndex: 999, backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', padding: '0.875rem 1.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {/* Mobile menu toggle */}
           <button onClick={() => setSidebarOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', color: '#1e1b4b', padding: '4px' }} className="adm-menu-toggle">
             <FiMenu size={22} />

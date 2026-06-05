@@ -22,7 +22,7 @@ function Footer() {
   const social = globalContent?.social || {};
 
   return (
-    <footer className="footer" style={{ borderTop: '1px solid #e5e7eb', backgroundColor: '#ffffff', color: '#4b5563', padding: '4rem 1rem', marginTop: '4rem' }}>
+    <footer className="footer" style={{ borderTop: '1px solid #e5e7eb', backgroundColor: '#ffffff', color: '#4b5563', padding: '2rem 1rem'}}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2.5rem' }}>
         
         <div>
