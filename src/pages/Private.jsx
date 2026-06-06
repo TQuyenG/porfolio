@@ -577,7 +577,7 @@ export default function Private() {
       ══════════════════════════════════ */}
       <div className="adm-main">
         {/* ── Top bar ── */}
-        <div style={{ position: 'sticky', top: '70px', zIndex: 999, backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', padding: '0.875rem 1.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: 999, backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', padding: '0.875rem 1.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {/* Mobile menu toggle */}
           <button onClick={() => setSidebarOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', color: '#1e1b4b', padding: '4px' }} className="adm-menu-toggle">
             <FiMenu size={22} />
@@ -694,20 +694,20 @@ export default function Private() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {(formData.stats || []).map((stat, idx) => (
-                    <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.875rem', alignItems: 'center', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', position: 'relative' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', position: 'relative' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
                         <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Icon</label>
                         <IconPicker value={stat.icon || 'briefcase'} onChange={key => { const s = [...formData.stats]; s[idx] = { ...s[idx], icon: key }; setFormData({ ...formData, stats: s }); }} />
                       </div>
-                      <div style={{ flex: '1 1 140px' }}>
+                      <div style={{ flex: '2 1 160px', minWidth: 0 }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Nhãn</label>
-                        <input className="adm-input-focus" style={inputStyle} type="text" value={stat.label} onChange={e => { const s = [...formData.stats]; s[idx] = { ...s[idx], label: e.target.value }; setFormData({ ...formData, stats: s }); }} />
+                        <input className="adm-input-focus" style={inputStyle} type="text" value={stat.label} onChange={e => { const s = [...formData.stats]; s[idx] = { ...s[idx], label: e.target.value }; setFormData({ ...formData, stats: s }); }} placeholder="VD: Dự Án BA" />
                       </div>
-                      <div style={{ flex: '0 1 80px' }}>
+                      <div style={{ flex: '1 1 90px', minWidth: '80px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Số</label>
                         <input className="adm-input-focus" style={inputStyle} type="number" value={stat.value} onChange={e => { const s = [...formData.stats]; s[idx] = { ...s[idx], value: Number(e.target.value) }; setFormData({ ...formData, stats: s }); }} />
                       </div>
-                      <div style={{ flex: '0 1 70px' }}>
+                      <div style={{ flex: '1 1 80px', minWidth: '70px' }}>
                         <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hậu tố</label>
                         <input className="adm-input-focus" style={inputStyle} type="text" value={stat.suffix} onChange={e => { const s = [...formData.stats]; s[idx] = { ...s[idx], suffix: e.target.value }; setFormData({ ...formData, stats: s }); }} placeholder="+" />
                       </div>
@@ -859,54 +859,70 @@ export default function Private() {
               {/* Hero intro */}
               <div className="admin-card">
                 <h3>Hero Intro (Split Layout)</h3>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={labelStyle}>Đoạn giới thiệu</label>
-                  <RichTextEditor value={formData.bio || ''} onChange={val => setFormData({ ...formData, bio: val })} />
+                {/* intro.title */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={labelStyle}>Tiêu đề intro (VD: "Về Tôi")</label>
+                  <input
+                    className="adm-input-focus" style={inputStyle} type="text"
+                    value={formData.intro?.title || ''}
+                    onChange={e => setFormData({ ...formData, intro: { ...(formData.intro || {}), title: e.target.value } })}
+                    placeholder="VD: Về Tôi"
+                  />
                 </div>
+                {/* intro.body — About.jsx đọc content?.intro?.body */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={labelStyle}>Đoạn giới thiệu (intro.body)</label>
+                  <RichTextEditor
+                    value={formData.intro?.body || ''}
+                    onChange={val => setFormData({ ...formData, intro: { ...(formData.intro || {}), body: val } })}
+                  />
+                </div>
+                {/* portraitUrl — About.jsx đọc content?.portraitUrl */}
                 <div style={{ padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                  <label style={labelStyle}>Ảnh Chân Dung (About)</label>
-                  {formData.aboutAvatarUrl && <img src={formData.aboutAvatarUrl} alt="about" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem', display: 'block' }} />}
+                  <label style={labelStyle}>Ảnh Chân Dung (portraitUrl)</label>
+                  {formData.portraitUrl && <img src={formData.portraitUrl} alt="portrait" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '10px', marginBottom: '0.75rem', display: 'block', border: '1px solid #e2e8f0' }} />}
                   <label style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '0.65rem 1rem', backgroundColor: '#6366f1', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, color: '#fff', fontSize: '0.85rem', width: 'fit-content' }}>
                     <FiUploadCloud size={15} /> Tải ảnh lên
-                    <input type="file" accept="image/*" onChange={e => handleSingleFileUpload(e, 'aboutAvatarUrl')} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" onChange={e => handleSingleFileUpload(e, 'portraitUrl')} style={{ display: 'none' }} />
                   </label>
                 </div>
               </div>
 
-              {/* Experiences */}
+              {/* Experiences / Timeline */}
               <div className="admin-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <h3 style={{ margin: 0 }}>Kinh Nghiệm Làm Việc (Timeline)</h3>
-                  <button onClick={() => setFormData({ ...formData, experiences: [...(formData.experiences || []), { title: '', company: '', date: '', description: '' }] })}
+                  <button onClick={() => setFormData({ ...formData, timeline: [...(formData.timeline || []), { title: '', company: '', date: '', description: '' }] })}
                     style={{ padding: '0.5rem 1rem', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', gap: '5px', fontSize: '0.85rem' }}>
                     <FiPlus size={14} /> Thêm
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {(formData.experiences || []).map((exp, idx) => (
+                  {(formData.timeline || []).map((exp, idx) => (
                     <div key={idx} style={{ background: '#f8fafc', padding: '1.125rem', borderRadius: '12px', border: '1px solid #e2e8f0', position: 'relative' }}>
-                      <button onClick={() => setFormData({ ...formData, experiences: (formData.experiences || []).filter((_, i) => i !== idx) })}
+                      <button onClick={() => setFormData({ ...formData, timeline: (formData.timeline || []).filter((_, i) => i !== idx) })}
                         style={{ position: 'absolute', top: '10px', right: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><FiTrash2 size={16} /></button>
                       <div className="admin-grid-auto" style={{ paddingRight: '2rem', marginBottom: '0.875rem' }}>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Chức vụ</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.title} onChange={e => { const arr = [...(formData.experiences || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, experiences: arr }); }} placeholder="VD: Business Analyst Intern" />
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.title || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="VD: Business Analyst Intern" />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Công ty</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.company} onChange={e => { const arr = [...(formData.experiences || [])]; arr[idx] = { ...arr[idx], company: e.target.value }; setFormData({ ...formData, experiences: arr }); }} placeholder="Tên công ty" />
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.company || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], company: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="Tên công ty" />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Thời gian</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.date} onChange={e => { const arr = [...(formData.experiences || [])]; arr[idx] = { ...arr[idx], date: e.target.value }; setFormData({ ...formData, experiences: arr }); }} placeholder="VD: 2024 – Hiện tại" />
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.date || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], date: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="VD: 2024 – Hiện tại" />
                         </div>
                       </div>
                       <div>
                         <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Mô tả công việc</label>
-                        <RichTextEditor value={exp.description || ''} onChange={val => { const arr = [...(formData.experiences || [])]; arr[idx] = { ...arr[idx], description: val }; setFormData({ ...formData, experiences: arr }); }} />
+                        <RichTextEditor value={exp.description || ''} onChange={val => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], description: val }; setFormData({ ...formData, timeline: arr }); }} />
                       </div>
                     </div>
                   ))}
+                  {(formData.timeline || []).length === 0 && <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#fff', borderRadius: '10px', border: '1px dashed #e2e8f0' }}>Chưa có kinh nghiệm. Nhấn "Thêm" để bắt đầu.</p>}
                 </div>
               </div>
 
@@ -944,10 +960,13 @@ export default function Private() {
                 </div>
               </div>
 
-              {/* Certs */}
+              {/* Certs — lưu vào formData.achievements (About.jsx đọc content?.achievements) */}
               <div className="admin-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <h3 style={{ margin: 0 }}>Chứng Chỉ &amp; Thành Tích (About)</h3>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Chứng Chỉ &amp; Thành Tích (About)</h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '3px 0 0' }}>Lưu vào field <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>achievements</code> — About.jsx đọc <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>content?.achievements</code></p>
+                  </div>
                   <button onClick={() => setFormData({ ...formData, achievements: [...(formData.achievements || []), { name: '', issuer: '', date: '', url: '', logo: '' }] })}
                     style={{ padding: '0.5rem 1rem', backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', gap: '5px', fontSize: '0.85rem' }}>
                     <FiPlus size={14} /> Thêm
@@ -990,22 +1009,27 @@ export default function Private() {
                     <div key={idx} style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', position: 'relative' }}>
                       <button onClick={() => setFormData({ ...formData, education: (formData.education || []).filter((_, i) => i !== idx) })}
                         style={{ position: 'absolute', top: '10px', right: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><FiTrash2 size={16} /></button>
-                      <div className="admin-grid-auto" style={{ paddingRight: '2rem' }}>
+                      <div className="admin-grid-auto" style={{ paddingRight: '2rem', marginBottom: '0.875rem' }}>
                         <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Chuyên ngành</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.title || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, education: arr }); }} />
+                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Chuyên ngành / Bằng cấp</label>
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.title || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, education: arr }); }} placeholder="VD: Kỹ sư Phần mềm" />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Trường / Tổ chức</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.company || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], company: e.target.value }; setFormData({ ...formData, education: arr }); }} />
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.company || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], company: e.target.value }; setFormData({ ...formData, education: arr }); }} placeholder="VD: Đại học Bách Khoa" />
                         </div>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Niên khóa</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.date || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], date: e.target.value }; setFormData({ ...formData, education: arr }); }} />
+                          <input className="adm-input-focus" style={inputStyle} type="text" value={edu.date || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], date: e.target.value }; setFormData({ ...formData, education: arr }); }} placeholder="VD: 2020 – 2024" />
                         </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Ghi chú thêm</label>
+                        <input className="adm-input-focus" style={inputStyle} type="text" value={edu.description || ''} onChange={e => { const arr = [...(formData.education || [])]; arr[idx] = { ...arr[idx], description: e.target.value }; setFormData({ ...formData, education: arr }); }} placeholder="VD: GPA 3.6/4.0, Học bổng..." />
                       </div>
                     </div>
                   ))}
+                  {(formData.education || []).length === 0 && <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#fff', borderRadius: '10px', border: '1px dashed #e2e8f0' }}>Chưa có thông tin học vấn.</p>}
                 </div>
               </div>
 
