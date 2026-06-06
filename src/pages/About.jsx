@@ -320,31 +320,72 @@ export default function About() {
           white-space:nowrap;
         }
 
-        /* ── Goals ── */
-        .ab-goals-grid {
-          display:grid;
-          grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));
-          gap:1.2rem;
+        /* ── Goals — zigzag ── */
+        .ab-goals-zz {
+          display: flex;
+          flex-direction: column;
+          gap: clamp(3rem,6vw,5rem);
         }
-        .ab-goal-card {
-          background:#fff; border:1.5px solid #f1f5f9; border-radius:16px;
-          padding:clamp(1.2rem,2.5vw,1.6rem);
-          display:flex; flex-direction:column; gap:0.8rem;
-          position:relative; overflow:hidden;
-          transition:all 0.25s;
+        .ab-goal-zz {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: clamp(1.5rem,4vw,3rem);
+          align-items: center;
         }
-        .ab-goal-card::before {
-          content:''; position:absolute; top:0; left:0; right:0; height:3px;
-          background:linear-gradient(90deg,#6366f1,#38bdf8);
+        @media(min-width:700px){
+          .ab-goal-zz { grid-template-columns: 1fr 1fr; }
+          .ab-goal-zz.reverse { direction: rtl; }
+          .ab-goal-zz.reverse > * { direction: ltr; }
         }
-        .ab-goal-card:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(15,23,42,0.08); }
-        .ab-goal-type {
-          font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em;
-          color:#6366f1; display:flex; align-items:center; gap:5px;
+        .ab-goal-zz-text {
+          display: flex; flex-direction: column; gap: 1rem;
         }
-        .ab-goal-title { font-size:clamp(0.95rem,2vw,1.05rem); font-weight:800; color:#0f172a; }
-        .ab-goal-desc  { font-size:clamp(0.8rem,1.6vw,0.88rem); color:#64748b; line-height:1.7; flex:1; }
-        .ab-goal-img   { width:100%; border-radius:10px; object-fit:cover; max-height:160px; margin-top:0.5rem; }
+        .ab-goal-zz-type {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 0.3rem 0.9rem; border-radius: 99px;
+          font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+          letter-spacing: 0.08em; width: fit-content;
+          background: linear-gradient(135deg,#fef3c7,#fde68a);
+          color: #92400e;
+        }
+        .ab-goal-zz-title {
+          font-family: 'Fraunces', serif;
+          font-size: clamp(1.15rem,2.8vw,1.5rem);
+          font-weight: 900; color: #0f172a; line-height: 1.2;
+        }
+        .ab-goal-zz-desc {
+          font-size: clamp(0.85rem,1.8vw,0.95rem);
+          color: #475569; line-height: 1.8;
+        }
+        .ab-goal-zz-imgs {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%,180px), 1fr));
+          gap: 0.75rem;
+        }
+        .ab-goal-zz-img {
+          width: 100%; aspect-ratio: 4/3;
+          object-fit: cover; border-radius: 14px;
+          box-shadow: 0 8px 24px rgba(15,23,42,0.1);
+          transition: transform 0.3s;
+        }
+        .ab-goal-zz-img:hover { transform: scale(1.03); }
+        .ab-goal-zz-placeholder {
+          width: 100%; aspect-ratio: 4/3;
+          border-radius: 14px;
+          background: linear-gradient(135deg,#fef3c7,#fde68a);
+          display: flex; align-items: center; justify-content: center;
+        }
+
+        /* ── Timeline images ── */
+        .ab-tl-images {
+          display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.875rem;
+        }
+        .ab-tl-img {
+          width: 90px; height: 68px; object-fit: cover;
+          border-radius: 8px; border: 1px solid #e2e8f0;
+          cursor: zoom-in; transition: transform 0.2s;
+        }
+        .ab-tl-img:hover { transform: scale(1.04); }
 
         /* ── CTA band ── */
         .ab-cta-band {
@@ -416,7 +457,49 @@ export default function About() {
             </div>
           </Section>
 
-          {/* ══ 2. SKILLS & TOOLKIT ══ */}
+          {/* ══ 2. GOALS & VISION — zigzag, TRƯỚC Skills ══ */}
+          {goals.length > 0 && (
+            <Section id="goals">
+              <Eyebrow icon="target" text="Định Hướng" color="#0e7490" bg="#cffafe" />
+              <div className="ab-divider" style={{ background: 'linear-gradient(90deg,#0891b2,#f59e0b)' }} />
+              <Heading sub="Mục tiêu ngắn hạn, dài hạn và định hướng phát triển sự nghiệp.">
+                Mục Tiêu & Định Hướng
+              </Heading>
+              <div className="ab-goals-zz">
+                {goals.map((g, i) => {
+                  const imgs = g.images && g.images.length > 0 ? g.images : (g.image ? [g.image] : []);
+                  return (
+                    <div key={i} className={`ab-goal-zz${i % 2 === 1 ? ' reverse' : ''}`}>
+                      {/* Text side */}
+                      <div className="ab-goal-zz-text">
+                        <div className="ab-goal-zz-type">
+                          <DynIcon name={g.icon || 'target'} size={11} color="#92400e" />
+                          {g.type || 'Mục tiêu'}
+                        </div>
+                        <div className="ab-goal-zz-title">{g.title}</div>
+                        <div className="ab-goal-zz-desc">{g.desc}</div>
+                      </div>
+                      {/* Image side */}
+                      <div className="ab-goal-zz-imgs">
+                        {imgs.length > 0
+                          ? imgs.map((src, ii) => (
+                              <img key={ii} src={src} alt={g.title} className="ab-goal-zz-img" />
+                            ))
+                          : (
+                            <div className="ab-goal-zz-placeholder">
+                              <DynIcon name={g.icon || 'target'} size={48} color="rgba(146,64,14,0.2)" />
+                            </div>
+                          )
+                        }
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Section>
+          )}
+
+          {/* ══ 3. SKILLS & TOOLKIT ══ */}
           {skills.length > 0 && (
             <Section id="toolkit">
               <Eyebrow icon="tool" text="Chuyên Môn" color="#0891b2" bg="#e0f2fe" />
@@ -455,7 +538,7 @@ export default function About() {
             </Section>
           )}
 
-          {/* ══ 3. TIMELINE (Kinh nghiệm) ══ */}
+          {/* ══ 4. TIMELINE (Kinh nghiệm) ══ */}
           {timeline.length > 0 && (
             <Section id="experience">
               <Eyebrow icon="briefcase" text="Kinh Nghiệm" color="#0f766e" bg="#ccfbf1" />
@@ -473,15 +556,23 @@ export default function About() {
                     <div className="ab-tl-card">
                       <div className="ab-tl-title">{item.title}</div>
                       {item.company && <div className="ab-tl-company">{item.company}</div>}
-                      <div className="ab-tl-desc" dangerouslySetInnerHTML={{ __html: item.desc }} />
+                      {(item.desc || item.description) && (
+                        <div className="ab-tl-desc" dangerouslySetInnerHTML={{ __html: item.desc || item.description }} />
+                      )}
+                      {/* Ảnh minh họa */}
+                      {(item.images && item.images.length > 0) && (
+                        <div className="ab-tl-images">
+                          {item.images.map((src, ii) => (
+                            <img key={ii} src={src} alt="" className="ab-tl-img" />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             </Section>
           )}
-
-          {/* ══ 4. ACHIEVEMENTS & CERTS ══ */}
           {achievements.length > 0 && (
             <Section id="achievements">
               <Eyebrow icon="award" text="Chứng Chỉ & Thành Tựu" color="#b45309" bg="#fef3c7" />
@@ -527,32 +618,6 @@ export default function About() {
                       <div className="ab-edu-school">{edu.company}</div>
                     </div>
                     <div className="ab-edu-date">{edu.date}</div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {/* ══ 6. GOALS & VISION ══ */}
-          {goals.length > 0 && (
-            <Section id="goals">
-              <Eyebrow icon="target" text="Định Hướng" color="#0e7490" bg="#cffafe" />
-              <div className="ab-divider" style={{ background:'linear-gradient(90deg,#0891b2,#6366f1)' }} />
-              <Heading sub="Mục tiêu ngắn hạn, dài hạn và định hướng phát triển sự nghiệp.">
-                Mục Tiêu & Định Hướng
-              </Heading>
-              <div className="ab-goals-grid">
-                {goals.map((g, i) => (
-                  <div key={i} className="ab-goal-card">
-                    <div className="ab-goal-type">
-                      <DynIcon name={g.icon || 'target'} size={11} color="#6366f1" />
-                      {g.type || 'Mục tiêu'}
-                    </div>
-                    <div className="ab-goal-title">{g.title}</div>
-                    <div className="ab-goal-desc">{g.desc}</div>
-                    {g.image && (
-                      <img src={g.image} alt={g.title} className="ab-goal-img" />
-                    )}
                   </div>
                 ))}
               </div>

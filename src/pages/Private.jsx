@@ -370,7 +370,7 @@ export default function Private() {
 
   /* ════════ ADMIN LAYOUT ════════ */
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'flex-start', backgroundColor: '#f1f5f9', position: 'relative' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#f1f5f9', position: 'relative' }}>
       <style>{`
         /* ── Sidebar ── */
         .adm-sidebar {
@@ -398,6 +398,8 @@ export default function Private() {
         .adm-main {
           flex: 1;
           min-width: 0;
+          overflow-y: auto;
+          max-height: 100vh;
         }
 
         /* ── Cards ── */
@@ -890,39 +892,145 @@ export default function Private() {
 
               {/* Experiences / Timeline */}
               <div className="admin-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <h3 style={{ margin: 0 }}>Kinh Nghiệm Làm Việc (Timeline)</h3>
-                  <button onClick={() => setFormData({ ...formData, timeline: [...(formData.timeline || []), { title: '', company: '', date: '', description: '' }] })}
-                    style={{ padding: '0.5rem 1rem', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', gap: '5px', fontSize: '0.85rem' }}>
-                    <FiPlus size={14} /> Thêm
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Kinh Nghiệm Làm Việc (Timeline)</h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '4px 0 0' }}>
+                      Field <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>year</code> dùng để hiện mốc thời gian trên timeline (VD: T6/2025 – T3/2026)
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {/* Sort tự động theo mốc thời gian */}
+                    <button
+                      onClick={() => {
+                        const parseDate = (s = '') => {
+                          const m = s.match(/T(\d+)\/(\d+)/);
+                          return m ? new Date(parseInt(m[2]), parseInt(m[1]) - 1) : new Date(0);
+                        };
+                        const sorted = [...(formData.timeline || [])].sort((a, b) => parseDate(b.year) - parseDate(a.year));
+                        setFormData({ ...formData, timeline: sorted });
+                      }}
+                      style={{ padding: '0.45rem 0.875rem', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <FiClock size={13} /> Tự động sắp xếp
+                    </button>
+                    <button onClick={() => setFormData({ ...formData, timeline: [...(formData.timeline || []), { title: '', company: '', year: '', desc: '', description: '', images: [] }] })}
+                      style={{ padding: '0.45rem 0.875rem', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem' }}>
+                      <FiPlus size={13} /> Thêm
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {(formData.timeline || []).map((exp, idx) => (
-                    <div key={idx} style={{ background: '#f8fafc', padding: '1.125rem', borderRadius: '12px', border: '1px solid #e2e8f0', position: 'relative' }}>
-                      <button onClick={() => setFormData({ ...formData, timeline: (formData.timeline || []).filter((_, i) => i !== idx) })}
-                        style={{ position: 'absolute', top: '10px', right: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><FiTrash2 size={16} /></button>
-                      <div className="admin-grid-auto" style={{ paddingRight: '2rem', marginBottom: '0.875rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Chức vụ</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.title || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="VD: Business Analyst Intern" />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                  {(formData.timeline || []).map((exp, idx) => {
+                    const list = formData.timeline || [];
+                    const moveUp = () => {
+                      if (idx === 0) return;
+                      const arr = [...list]; [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+                      setFormData({ ...formData, timeline: arr });
+                    };
+                    const moveDown = () => {
+                      if (idx === list.length - 1) return;
+                      const arr = [...list]; [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+                      setFormData({ ...formData, timeline: arr });
+                    };
+                    const updTl = (patch) => {
+                      const arr = [...list]; arr[idx] = { ...arr[idx], ...patch };
+                      setFormData({ ...formData, timeline: arr });
+                    };
+                    return (
+                      <div key={idx} style={{ background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                        {/* Header row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <button onClick={moveUp} disabled={idx === 0} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 5px', color: idx === 0 ? '#cbd5e1' : '#6366f1' }}><FiArrowUp size={14} /></button>
+                            <button onClick={moveDown} disabled={idx === list.length - 1} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 5px', color: idx === list.length - 1 ? '#cbd5e1' : '#6366f1' }}><FiArrowDown size={14} /></button>
+                          </div>
+                          <span style={{ flex: 1, fontWeight: 700, color: '#1e1b4b', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {exp.title || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa đặt tiêu đề</span>}
+                          </span>
+                          {exp.year && <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 700, background: '#eef2ff', padding: '0.2rem 0.6rem', borderRadius: '6px', flexShrink: 0 }}>{exp.year}</span>}
+                          <button onClick={() => setFormData({ ...formData, timeline: list.filter((_, i) => i !== idx) })}
+                            style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', flexShrink: 0 }}><FiTrash2 size={15} /></button>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Công ty</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.company || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], company: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="Tên công ty" />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Thời gian</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={exp.date || ''} onChange={e => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], date: e.target.value }; setFormData({ ...formData, timeline: arr }); }} placeholder="VD: 2024 – Hiện tại" />
+
+                        {/* Body */}
+                        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                          <div className="admin-grid-auto">
+                            <div>
+                              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Chức vụ / Tên mốc</label>
+                              <input className="adm-input-focus" style={inputStyle} type="text"
+                                value={exp.title || ''}
+                                onChange={e => updTl({ title: e.target.value })}
+                                placeholder="VD: Business Analyst Intern" />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Công ty / Tổ chức</label>
+                              <input className="adm-input-focus" style={inputStyle} type="text"
+                                value={exp.company || ''}
+                                onChange={e => updTl({ company: e.target.value })}
+                                placeholder="Tên công ty" />
+                            </div>
+                            <div>
+                              {/* year — About.jsx đọc item.year */}
+                              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6366f1', display: 'block', marginBottom: '3px' }}>
+                                Mốc thời gian <code style={{ background: '#eef2ff', padding: '1px 5px', borderRadius: 4, fontSize: '0.72rem' }}>year</code>
+                              </label>
+                              <input className="adm-input-focus" style={{ ...inputStyle, borderColor: '#c7d2fe' }} type="text"
+                                value={exp.year || ''}
+                                onChange={e => updTl({ year: e.target.value })}
+                                placeholder="VD: T6/2025 – T3/2026" />
+                            </div>
+                          </div>
+
+                          {/* desc — About.jsx đọc item.desc */}
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#6366f1', display: 'block', marginBottom: '3px' }}>
+                              Mô tả <code style={{ background: '#eef2ff', padding: '1px 5px', borderRadius: 4, fontSize: '0.72rem' }}>desc</code>
+                            </label>
+                            <RichTextEditor
+                              value={exp.desc || exp.description || ''}
+                              onChange={val => updTl({ desc: val, description: val })}
+                            />
+                          </div>
+
+                          {/* Images */}
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '6px' }}>Ảnh minh họa (tùy chọn)</label>
+                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {(exp.images || []).map((imgUrl, ii) => (
+                                <div key={ii} style={{ position: 'relative' }}>
+                                  <img src={imgUrl} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'block' }} />
+                                  <button onClick={() => updTl({ images: (exp.images || []).filter((_, j) => j !== ii) })}
+                                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, background: '#ef4444', border: 'none', borderRadius: '50%', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <FiX size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.45rem 0.875rem', backgroundColor: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                                <FiImage size={13} color="#6366f1" /> Thêm ảnh
+                                <input type="file" accept="image/*" multiple style={{ display: 'none' }}
+                                  onChange={async e => {
+                                    const files = Array.from(e.target.files);
+                                    const urls = [...(exp.images || [])];
+                                    for (const f of files) {
+                                      const res = await uploadFileToStorage(f, 'assets');
+                                      if (!res.error) urls.push(res.url);
+                                    }
+                                    updTl({ images: urls });
+                                    e.target.value = '';
+                                  }} />
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '3px' }}>Mô tả công việc</label>
-                        <RichTextEditor value={exp.description || ''} onChange={val => { const arr = [...(formData.timeline || [])]; arr[idx] = { ...arr[idx], description: val }; setFormData({ ...formData, timeline: arr }); }} />
-                      </div>
-                    </div>
-                  ))}
-                  {(formData.timeline || []).length === 0 && <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#fff', borderRadius: '10px', border: '1px dashed #e2e8f0' }}>Chưa có kinh nghiệm. Nhấn "Thêm" để bắt đầu.</p>}
+                    );
+                  })}
+                  {(formData.timeline || []).length === 0 && (
+                    <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#fff', borderRadius: '10px', border: '1px dashed #e2e8f0' }}>
+                      Chưa có kinh nghiệm. Nhấn "Thêm" để bắt đầu.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1036,46 +1144,86 @@ export default function Private() {
               {/* Goals & Vision */}
               <div className="admin-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <h3 style={{ margin: 0 }}>Mục Tiêu &amp; Định Hướng</h3>
-                  <button onClick={() => setFormData({ ...formData, goals: [...(formData.goals || []), { type: 'Ngắn hạn', title: '', desc: '', image: '' }] })}
-                    style={{ padding: '0.5rem 1rem', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', gap: '5px', fontSize: '0.85rem' }}>
-                    <FiPlus size={14} /> Thêm mục tiêu
+                  <div>
+                    <h3 style={{ margin: 0 }}>Mục Tiêu &amp; Định Hướng</h3>
+                    <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '4px 0 0' }}>Hiển thị trước Skills trên trang Giới Thiệu — zigzag layout</p>
+                  </div>
+                  <button onClick={() => setFormData({ ...formData, goals: [...(formData.goals || []), { type: 'Ngắn hạn', icon: 'target', title: '', desc: '', images: [] }] })}
+                    style={{ padding: '0.45rem 0.875rem', backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem' }}>
+                    <FiPlus size={13} /> Thêm mục tiêu
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                  {(formData.goals || []).map((goal, idx) => (
-                    <div key={idx} style={{ background: '#fffbeb', padding: '1.125rem', borderRadius: '12px', border: '1px solid #fde68a', position: 'relative' }}>
-                      <button onClick={() => setFormData({ ...formData, goals: (formData.goals || []).filter((_, i) => i !== idx) })}
-                        style={{ position: 'absolute', top: '10px', right: '10px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}><FiTrash2 size={16} /></button>
-                      <div className="admin-grid-auto" style={{ marginBottom: '0.875rem', paddingRight: '2rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '3px' }}>Loại mục tiêu</label>
-                          <select value={goal.type || 'Ngắn hạn'} onChange={e => { const arr = [...(formData.goals || [])]; arr[idx] = { ...arr[idx], type: e.target.value }; setFormData({ ...formData, goals: arr }); }}
-                            style={{ ...inputStyle, cursor: 'pointer', fontWeight: 700 }}>
+                  {(formData.goals || []).map((goal, idx) => {
+                    const updGoal = (patch) => {
+                      const arr = [...(formData.goals || [])]; arr[idx] = { ...arr[idx], ...patch };
+                      setFormData({ ...formData, goals: arr });
+                    };
+                    return (
+                      <div key={idx} style={{ background: '#fffbeb', borderRadius: '12px', border: '1px solid #fde68a', overflow: 'hidden' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', backgroundColor: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
+                          <IconPicker value={goal.icon || 'target'} onChange={key => updGoal({ icon: key })} />
+                          <span style={{ flex: 1, fontWeight: 700, color: '#92400e', fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {goal.title || <span style={{ fontStyle: 'italic', color: '#d97706' }}>Chưa đặt tiêu đề</span>}
+                          </span>
+                          <select value={goal.type || 'Ngắn hạn'} onChange={e => updGoal({ type: e.target.value })}
+                            style={{ padding: '0.3rem 0.6rem', border: '1px solid #fde68a', borderRadius: '7px', fontSize: '0.78rem', fontWeight: 700, color: '#92400e', backgroundColor: '#fff', outline: 'none', flexShrink: 0 }}>
                             <option>Ngắn hạn</option>
                             <option>Dài hạn</option>
                             <option>Định hướng</option>
                             <option>Giá trị cốt lõi</option>
                           </select>
+                          <button onClick={() => setFormData({ ...formData, goals: (formData.goals || []).filter((_, i) => i !== idx) })}
+                            style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', flexShrink: 0 }}><FiTrash2 size={15} /></button>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '3px' }}>Tiêu đề</label>
-                          <input className="adm-input-focus" style={inputStyle} type="text" value={goal.title || ''} onChange={e => { const arr = [...(formData.goals || [])]; arr[idx] = { ...arr[idx], title: e.target.value }; setFormData({ ...formData, goals: arr }); }} placeholder="VD: Trở thành Senior BA trong 2 năm" />
+                        {/* Body */}
+                        <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '3px' }}>Tiêu đề</label>
+                            <input className="adm-input-focus" style={{ ...inputStyle, borderColor: '#fde68a' }} type="text"
+                              value={goal.title || ''} onChange={e => updGoal({ title: e.target.value })}
+                              placeholder="VD: Trở thành Senior BA trong 2 năm" />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '3px' }}>Mô tả</label>
+                            <textarea rows={3} value={goal.desc || ''} onChange={e => updGoal({ desc: e.target.value })}
+                              style={{ ...inputStyle, resize: 'vertical', borderColor: '#fde68a' }} placeholder="Mô tả chi tiết mục tiêu..." />
+                          </div>
+                          {/* Images — nhiều ảnh */}
+                          <div>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '6px' }}>Ảnh minh họa</label>
+                            <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {(goal.images || (goal.image ? [goal.image] : [])).map((imgUrl, ii) => (
+                                <div key={ii} style={{ position: 'relative' }}>
+                                  <img src={imgUrl} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: '8px', border: '1px solid #fde68a', display: 'block' }} />
+                                  <button onClick={() => updGoal({ images: (goal.images || []).filter((_, j) => j !== ii), image: '' })}
+                                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, background: '#ef4444', border: 'none', borderRadius: '50%', cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <FiX size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.4rem 0.75rem', backgroundColor: '#fff', border: '1.5px dashed #fde68a', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#92400e' }}>
+                                <FiImage size={13} /> Thêm ảnh
+                                <input type="file" accept="image/*" multiple style={{ display: 'none' }}
+                                  onChange={async e => {
+                                    const files = Array.from(e.target.files);
+                                    const urls = [...(goal.images || (goal.image ? [goal.image] : []))];
+                                    for (const f of files) {
+                                      const res = await uploadFileToStorage(f, 'assets');
+                                      if (!res.error) urls.push(res.url);
+                                    }
+                                    updGoal({ images: urls });
+                                    e.target.value = '';
+                                  }} />
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div style={{ marginBottom: '0.75rem' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400e', display: 'block', marginBottom: '3px' }}>Mô tả</label>
-                        <textarea rows={2} value={goal.desc || ''} onChange={e => { const arr = [...(formData.goals || [])]; arr[idx] = { ...arr[idx], desc: e.target.value }; setFormData({ ...formData, goals: arr }); }} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Mô tả chi tiết..." />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                        {goal.image && <img src={goal.image} alt="" style={{ width: '70px', height: '50px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #fde68a' }} />}
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.875rem', backgroundColor: '#fff', border: '1px solid #fde68a', borderRadius: '7px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#92400e' }}>
-                          <FiImage size={13} /> Ảnh minh họa
-                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => { if (e.target.files[0]) { const res = await uploadFileToStorage(e.target.files[0], 'assets'); if (!res.error) { const arr = [...(formData.goals || [])]; arr[idx] = { ...arr[idx], image: res.url }; setFormData({ ...formData, goals: arr }); } } }} />
-                        </label>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  {(formData.goals || []).length === 0 && <p style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.875rem', backgroundColor: '#fff', borderRadius: '10px', border: '1px dashed #fde68a' }}>Chưa có mục tiêu. Nhấn "Thêm mục tiêu" để bắt đầu.</p>}
                 </div>
               </div>
 
