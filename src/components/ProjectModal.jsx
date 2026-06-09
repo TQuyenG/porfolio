@@ -1,11 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   FiX, FiCheck, FiPlus, FiTrash2, FiUploadCloud,
-  FiChevronUp, FiChevronDown, FiEdit3, FiEdit, FiImage,
-  FiType, FiGrid, FiPaperclip, FiBarChart2,
+  FiChevronUp, FiChevronDown, FiChevronLeft, FiChevronRight,
+  FiEdit3, FiEdit, FiImage, FiType, FiGrid, FiPaperclip, FiBarChart2,
   FiChevronsRight, FiEye, FiEyeOff, FiLink, FiLayers, FiCopy, FiList,
   FiAlignLeft, FiAlignCenter, FiAlignRight, FiDroplet,
-  FiTag, FiRefreshCw,
+  FiRefreshCw, FiBold, FiItalic, FiUnderline, FiHash,
+  FiRotateCcw, FiRotateCw, FiSquare, FiColumns, FiMinus,
+  FiPlusSquare, FiMinusSquare, FiDownload, FiClipboard,
+  FiAlertTriangle, FiFileText, FiBorderAll, FiGrid as FiGridIcon,
 } from 'react-icons/fi';
 import RichTextEditor from './RichTextEditor';
 import { uploadFileToStorage } from '../utils/supabaseClient';
@@ -88,245 +91,435 @@ const emptySection = (type = 'text', parentId = null) => ({
   chartShowValues: true,
   chartShowLegend: true,
   showInToc: true,
+  analysisText: '',   // phân tích / ghi chú cho image, chart, table
 });
 
-/* ═══════════ TABLE EDITOR ═══════════ */
-/* clipboard bảng — dùng module-level ref để chia sẻ giữa các TableEditor */
-let _tableCopied = null; // { tableData }
+/* ═══════════ TABLE EDITOR — nâng cấp toàn diện ═══════════ */
+let _tableCopied = null;
 
-function TableEditor({ tableData, onChange, onDuplicateSection }) {
+/* ── Phân tích / Ghi chú dùng chung cho image/chart/table ── */
+function AnalysisEditor({ value, onChange, onUploadImage }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: '0.875rem' }}>
+      <button type="button" onClick={() => setOpen(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.4rem 0.875rem', backgroundColor: open ? '#eff6ff' : '#f8fafc', color: open ? '#2563eb' : '#475569', border: `1.5px solid ${open ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}>
+        <FiFileText size={13} /> {open ? 'Ẩn phân tích / ghi chú' : (value ? '✏ Chỉnh sửa phân tích / ghi chú' : '+ Thêm phân tích / ghi chú')}
+        {value && !open && <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#2563eb', flexShrink: 0 }} />}
+      </button>
+      {open && (
+        <div style={{ marginTop: '0.625rem', border: '1.5px solid #bfdbfe', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          <div style={{ padding: '0.5rem 0.875rem', backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <FiFileText size={12} /> Phân tích / Ghi chú — hỗ trợ văn bản đầy đủ, xuống dòng, định dạng
+          </div>
+          <RichTextEditor value={value || ''} onChange={onChange} onUploadImage={onUploadImage} compact={true} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TableEditor({ tableData, onChange, onDuplicateSection, onUploadImage, analysisText, onAnalysisChange }) {
   const {
     headers = [],
     rows = [],
     showHeader = true,
     autoNumber = false,
     cellStyles = {},
+    merges = {},        // { "ri_ci": { rowspan, colspan } }
+    borderStyle = {},   // { color, width, style } — global
   } = tableData;
 
-  const [selected, setSelected] = useState(null); // { ri, ci }
-  const [copyPopup, setCopyPopup] = useState(null); // { ri, ci } — vị trí popup paste
-  const [pasteFrom, setPasteFrom] = useState(null); // index ri bắt đầu kéo
-  const [hasCopy, setHasCopy] = useState(false); // để re-render khi clipboard thay đổi
+  /* ── Undo / Redo stack ── */
+  const [history, setHistory]   = useState([deepClone(tableData)]);
+  const [histIdx, setHistIdx]   = useState(0);
+  const isUndoing = useRef(false);
 
-  const update = (patch) => onChange({ ...tableData, ...patch });
+  /* ── Multi-select ── */
+  const [selStart, setSelStart] = useState(null); // { ri, ci }
+  const [selEnd,   setSelEnd]   = useState(null); // { ri, ci }
+  const [isSelecting, setIsSelecting] = useState(false);
 
-  /* Cells */
-  const updateCell = (ri, ci, val) => {
-    const newR = rows.map((r, i) => i === ri ? r.map((c, j) => j === ci ? val : c) : r);
-    update({ rows: newR });
+  /* ── UI state ── */
+  const [copyPopup,    setCopyPopup]    = useState(false);
+  const [hasCopy,      setHasCopy]      = useState(!!_tableCopied);
+  const [importPopup,  setImportPopup]  = useState(null); // null | 'confirm' | File
+  const [pendingFile,  setPendingFile]  = useState(null);
+  const [borderPopup,  setBorderPopup]  = useState(false);
+  const [borderColor,  setBorderColor]  = useState(borderStyle.color  || '#e2e8f0');
+  const [borderWidth,  setBorderWidth]  = useState(borderStyle.width  || '1px');
+  const [borderStroke, setBorderStroke] = useState(borderStyle.style  || 'solid');
+
+  /* Push snapshot vào history */
+  const push = useCallback((newData) => {
+    if (isUndoing.current) return;
+    setHistory(h => {
+      const trimmed = h.slice(0, histIdx + 1);
+      const next = [...trimmed, deepClone(newData)].slice(-30); // giữ 30 bước
+      return next;
+    });
+    setHistIdx(i => Math.min(i + 1, 29));
+    onChange(newData);
+  }, [histIdx, onChange]);
+
+  /* update = push snapshot + notify parent */
+  const update = useCallback((patch) => {
+    const newData = { ...tableData, ...patch };
+    push(newData);
+  }, [tableData, push]);
+
+  const undo = () => {
+    if (histIdx <= 0) return;
+    isUndoing.current = true;
+    const ni = histIdx - 1;
+    setHistIdx(ni);
+    onChange(history[ni]);
+    setTimeout(() => { isUndoing.current = false; }, 50);
   };
-  const updateHeader = (ci, val) => {
-    const h = [...headers]; h[ci] = val; update({ headers: h });
+  const redo = () => {
+    if (histIdx >= history.length - 1) return;
+    isUndoing.current = true;
+    const ni = histIdx + 1;
+    setHistIdx(ni);
+    onChange(history[ni]);
+    setTimeout(() => { isUndoing.current = false; }, 50);
   };
 
-  /* Rows */
-  const addRow = () => update({ rows: [...rows, headers.map(() => '')] });
-  const removeRow = (ri) => { if (rows.length <= 1) return; update({ rows: rows.filter((_, i) => i !== ri) }); };
-  const duplicateRow = (ri) => {
-    const newR = [...rows]; newR.splice(ri + 1, 0, deepClone(rows[ri])); update({ rows: newR });
+  /* Keyboard shortcut Ctrl+Z / Ctrl+Y */
+  useEffect(() => {
+    const h = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+
+  /* Clipboard broadcast */
+  useEffect(() => {
+    const h = () => setHasCopy(!!_tableCopied);
+    window.addEventListener('tableClipboardUpdate', h);
+    return () => window.removeEventListener('tableClipboardUpdate', h);
+  }, []);
+
+  /* ── Multi-select helpers ── */
+  const getSelRange = () => {
+    if (!selStart || !selEnd) return null;
+    return {
+      r0: Math.min(selStart.ri, selEnd.ri), r1: Math.max(selStart.ri, selEnd.ri),
+      c0: Math.min(selStart.ci, selEnd.ci), c1: Math.max(selStart.ci, selEnd.ci),
+    };
   };
-  const moveRow = (ri, dir) => {
-    const ni = ri + dir; if (ni < 0 || ni >= rows.length) return;
-    const newR = [...rows]; [newR[ri], newR[ni]] = [newR[ni], newR[ri]]; update({ rows: newR });
+  const inRange = (ri, ci) => {
+    const r = getSelRange(); if (!r) return selStart?.ri === ri && selStart?.ci === ci;
+    return ri >= r.r0 && ri <= r.r1 && ci >= r.c0 && ci <= r.c1;
+  };
+  const selectRow = (ri) => { setSelStart({ ri, ci: 0 }); setSelEnd({ ri, ci: headers.length - 1 }); };
+  const selectCol = (ci) => { setSelStart({ ri: 0, ci }); setSelEnd({ ri: rows.length - 1, ci }); };
+
+  /* Apply style to all selected cells */
+  const applyStyleToSelection = (patch) => {
+    const r = getSelRange();
+    if (!r) {
+      if (selStart) setCStyleDirect(selStart.ri, selStart.ci, patch);
+      return;
+    }
+    const newStyles = { ...cellStyles };
+    for (let ri = r.r0; ri <= r.r1; ri++)
+      for (let ci = r.c0; ci <= r.c1; ci++) {
+        const k = `${ri}_${ci}`;
+        newStyles[k] = { ...(newStyles[k] || {}), ...patch };
+      }
+    update({ cellStyles: newStyles });
   };
 
-  /* Cols */
-  const addCol = () => update({ headers: [...headers, `Cột ${String.fromCharCode(65 + headers.length)}`], rows: rows.map(r => [...r, '']) });
-  const removeCol = (ci) => {
-    if (headers.length <= 1) return;
-    update({ headers: headers.filter((_, i) => i !== ci), rows: rows.map(r => r.filter((_, i) => i !== ci)) });
-  };
-  const moveCol = (ci, dir) => {
-    const ni = ci + dir; if (ni < 0 || ni >= headers.length) return;
-    const newH = [...headers]; [newH[ci], newH[ni]] = [newH[ni], newH[ci]];
-    const newR = rows.map(r => { const nr = [...r]; [nr[ci], nr[ni]] = [nr[ni], nr[ci]]; return nr; });
-    update({ headers: newH, rows: newR });
-  };
-
-  /* Cell styles */
   const getCStyle = (ri, ci) => cellStyles[`${ri}_${ci}`] || {};
-  const setCStyle = (ri, ci, patch) => {
+  const setCStyleDirect = (ri, ci, patch) => {
     const k = `${ri}_${ci}`;
     update({ cellStyles: { ...cellStyles, [k]: { ...getCStyle(ri, ci), ...patch } } });
   };
 
-  /* ── NHÂN BẢN bảng ──
-     Lưu vào _tableCopied, các bảng khác thấy được nhờ setHasCopy */
-  const handleCopyTable = () => {
-    _tableCopied = deepClone(tableData);
-    setHasCopy(true);
-    // Broadcast cho các TableEditor khác — dùng custom event
-    window.dispatchEvent(new Event('tableClipboardUpdate'));
+  /* ── Cell ops ── */
+  const updateCell = (ri, ci, val) => {
+    const newR = rows.map((r, i) => i === ri ? r.map((c, j) => j === ci ? val : c) : r);
+    update({ rows: newR });
+  };
+  const updateHeader = (ci, val) => { const h = [...headers]; h[ci] = val; update({ headers: h }); };
+
+  /* ── Row ops ── */
+  const addRow    = (atIdx = rows.length)  => { const nr = [...rows]; nr.splice(atIdx, 0, headers.map(() => '')); update({ rows: nr }); };
+  const removeRow = (ri)  => { if (rows.length <= 1) return; update({ rows: rows.filter((_, i) => i !== ri) }); };
+  const duplicateRow = (ri) => { const nr = [...rows]; nr.splice(ri + 1, 0, deepClone(rows[ri])); update({ rows: nr }); };
+  const moveRow   = (ri, dir) => { const ni = ri + dir; if (ni < 0 || ni >= rows.length) return; const nr = [...rows]; [nr[ri], nr[ni]] = [nr[ni], nr[ri]]; update({ rows: nr }); };
+
+  /* ── Col ops ── */
+  const addCol    = (atIdx = headers.length) => {
+    const nh = [...headers]; nh.splice(atIdx, 0, `Cột ${String.fromCharCode(65 + atIdx)}`);
+    const nr = rows.map(r => { const rc = [...r]; rc.splice(atIdx, 0, ''); return rc; });
+    update({ headers: nh, rows: nr });
+  };
+  const removeCol = (ci) => { if (headers.length <= 1) return; update({ headers: headers.filter((_, i) => i !== ci), rows: rows.map(r => r.filter((_, i) => i !== ci)) }); };
+  const moveCol   = (ci, dir) => { const ni = ci + dir; if (ni < 0 || ni >= headers.length) return; const nh = [...headers]; [nh[ci], nh[ni]] = [nh[ni], nh[ci]]; const nr = rows.map(r => { const rc = [...r]; [rc[ci], rc[ni]] = [rc[ni], rc[ci]]; return rc; }); update({ headers: nh, rows: nr }); };
+
+  /* ── Merge / Unmerge ── */
+  const mergeSelection = () => {
+    const r = getSelRange(); if (!r) return;
+    const newMerges = { ...merges };
+    // Đặt merge cho ô đầu, ẩn các ô còn lại
+    newMerges[`${r.r0}_${r.c0}`] = { rowspan: r.r1 - r.r0 + 1, colspan: r.c1 - r.c0 + 1 };
+    for (let ri = r.r0; ri <= r.r1; ri++)
+      for (let ci = r.c0; ci <= r.c1; ci++)
+        if (ri !== r.r0 || ci !== r.c0) newMerges[`${ri}_${ci}`] = { hidden: true };
+    update({ merges: newMerges });
+  };
+  const unmergeSelection = () => {
+    const r = getSelRange(); if (!r) return;
+    const newMerges = { ...merges };
+    for (let ri = r.r0; ri <= r.r1; ri++)
+      for (let ci = r.c0; ci <= r.c1; ci++)
+        delete newMerges[`${ri}_${ci}`];
+    update({ merges: newMerges });
   };
 
-  useEffect(() => {
-    const onUpdate = () => setHasCopy(!!_tableCopied);
-    window.addEventListener('tableClipboardUpdate', onUpdate);
-    return () => window.removeEventListener('tableClipboardUpdate', onUpdate);
-  }, []);
+  /* ── Import Excel / CSV ── */
+  const doImport = async (file) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      try {
+        const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js').catch(() => null);
+        if (!XLSX) { alert('Không tải được thư viện xlsx. Hãy dùng CSV.'); return; }
+        const buf = await file.arrayBuffer();
+        const wb  = XLSX.read(buf, { type: 'array' });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (raw.length === 0) return;
+        const newHeaders = (raw[0] || []).map(String);
+        const newRows    = raw.slice(1).map(r => newHeaders.map((_, ci) => String(r[ci] ?? '')));
+        update({ headers: newHeaders, rows: newRows });
+      } catch (err) { alert('Lỗi khi đọc file Excel: ' + err.message); }
+    } else {
+      // CSV — đọc UTF-8 đúng tiếng Việt
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      const parse = (line) => {
+        const result = []; let cur = ''; let inQ = false;
+        for (const ch of line) {
+          if (ch === '"') { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+          else cur += ch;
+        }
+        result.push(cur.trim());
+        return result;
+      };
+      const parsed = lines.map(parse);
+      update({ headers: parsed[0] || [], rows: parsed.slice(1) });
+    }
+    setImportPopup(null); setPendingFile(null);
+  };
 
-  /* Paste options khi nhấn "Dán" ở bảng đích */
+  const handleFileInput = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    e.target.value = '';
+    const hasData = rows.some(r => r.some(c => c !== ''));
+    if (hasData) { setPendingFile(file); setImportPopup('confirm'); }
+    else doImport(file);
+  };
+
+  /* ── Clipboard ── */
+  const handleCopyTable = () => { _tableCopied = deepClone(tableData); setHasCopy(true); window.dispatchEvent(new Event('tableClipboardUpdate')); };
   const handlePasteAction = (mode) => {
     if (!_tableCopied) return;
-    if (mode === 'replace') {
-      // Đè hoàn toàn
-      onChange(deepClone(_tableCopied));
-    } else if (mode === 'append') {
-      // Thêm hàng từ clipboard vào cuối
-      const srcRows = _tableCopied.rows || [];
-      update({ rows: [...rows, ...deepClone(srcRows)] });
-    } else if (mode === 'from_cell' && selected) {
-      // Paste từ ô được chọn trở đi
-      const { ri: startRi, ci: startCi } = selected;
-      const srcRows = _tableCopied.rows || [];
-      const newRows = deepClone(rows);
-      srcRows.forEach((srcRow, dri) => {
-        srcRow.forEach((cell, dci) => {
-          const tRi = startRi + dri;
-          const tCi = startCi + dci;
-          if (tRi < newRows.length && tCi < (newRows[tRi]?.length || 0)) {
-            newRows[tRi][tCi] = cell;
-          }
-        });
-      });
-      update({ rows: newRows });
+    if (mode === 'replace') push(deepClone(_tableCopied));
+    else if (mode === 'append') update({ rows: [...rows, ...deepClone(_tableCopied.rows || [])] });
+    else if (mode === 'from_cell' && selStart) {
+      const { ri: sRi, ci: sCi } = selStart;
+      const nr = deepClone(rows);
+      (_tableCopied.rows || []).forEach((sr, dri) => sr.forEach((cell, dci) => {
+        const tRi = sRi + dri, tCi = sCi + dci;
+        if (tRi < nr.length && tCi < (nr[tRi]?.length || 0)) nr[tRi][tCi] = cell;
+      }));
+      update({ rows: nr });
     }
-    setCopyPopup(null);
+    setCopyPopup(false);
   };
 
-  /* Import CSV */
-  const handleCsvImport = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const lines = ev.target.result.trim().split('\n').map(l => l.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
-      if (lines.length < 1) return;
-      update({ headers: lines[0], rows: lines.slice(1) });
-    };
-    reader.readAsText(file); e.target.value = '';
+  /* ── Apply border to selection ── */
+  const applyBorder = () => {
+    update({ borderStyle: { color: borderColor, width: borderWidth, style: borderStroke } });
+    setBorderPopup(false);
   };
 
-  const sel = selected;
-  const selStyle = sel ? getCStyle(sel.ri, sel.ci) : {};
-  const CELL_MIN_W = 130;
+  const range    = getSelRange();
+  const selStyle = selStart ? getCStyle(selStart.ri, selStart.ci) : {};
+  const hasMulti = range && (range.r1 > range.r0 || range.c1 > range.c0);
 
-  const TB = ({ onClick, title, active, children, danger }) => (
-    <button type="button" title={title} onClick={onClick}
-      style={{ padding: '0.28rem 0.5rem', border: `1px solid ${danger ? '#fecaca' : active ? '#93c5fd' : '#e2e8f0'}`, borderRadius: '4px', background: danger ? '#fff' : active ? '#eff6ff' : '#fff', cursor: 'pointer', color: danger ? '#ef4444' : active ? '#2563eb' : '#374151', fontSize: '0.77rem', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+  const TB = ({ onClick, title, active, children, danger, disabled }) => (
+    <button type="button" title={title} onClick={onClick} disabled={disabled}
+      style={{ padding: '0.28rem 0.5rem', border: `1px solid ${danger ? '#fecaca' : active ? '#93c5fd' : '#e2e8f0'}`, borderRadius: '4px', background: danger ? '#fff' : active ? '#eff6ff' : '#fff', cursor: disabled ? 'not-allowed' : 'pointer', color: danger ? '#ef4444' : active ? '#2563eb' : '#374151', fontSize: '0.77rem', display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap', flexShrink: 0, opacity: disabled ? 0.4 : 1 }}>
       {children}
     </button>
   );
   const Div = () => <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 1px', flexShrink: 0 }} />;
 
+  const bStyle = { color: borderColor, width: borderWidth, style: borderStroke };
+  const cellBorder = `${bStyle.width} ${bStyle.style} ${bStyle.color}`;
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div>
       {/* ── Toolbar ── */}
       <div style={{ display: 'flex', gap: '3px', padding: '0.45rem 0.5rem', backgroundColor: '#f8fafc', borderRadius: '8px', marginBottom: '0.5rem', flexWrap: 'wrap', alignItems: 'center', border: '1px solid #e2e8f0' }}>
 
-        {/* Header controls */}
-        <TB onClick={() => update({ showHeader: !showHeader })} active={showHeader} title="Hiện/ẩn hàng tiêu đề">
-          {showHeader ? <FiEye size={11} /> : <FiEyeOff size={11} />} Header
-        </TB>
-        <TB onClick={() => update({ autoNumber: !autoNumber })} active={autoNumber} title="Tự đánh số thứ tự hàng">
-          # STT
-        </TB>
+        {/* Undo / Redo */}
+        <TB onClick={undo} disabled={histIdx <= 0} title="Hoàn tác (Ctrl+Z)"><FiRotateCcw size={11} /></TB>
+        <TB onClick={redo} disabled={histIdx >= history.length - 1} title="Làm lại (Ctrl+Y)"><FiRotateCw size={11} /></TB>
 
         <Div />
 
-        {/* Cell style — hiện khi chọn ô */}
-        {sel && (
+        {/* Header / STT */}
+        <TB onClick={() => update({ showHeader: !showHeader })} active={showHeader} title="Hiện/ẩn hàng tiêu đề"><FiEye size={11} /> Header</TB>
+        <TB onClick={() => update({ autoNumber: !autoNumber })} active={autoNumber} title="Tự đánh số thứ tự hàng"><FiHash size={11} /> STT</TB>
+
+        <Div />
+
+        {/* Cell style — áp dụng cho selection */}
+        {selStart && (
           <>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { bold: !selStyle.bold })} active={selStyle.bold} title="In đậm"><b>B</b></TB>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { italic: !selStyle.italic })} active={selStyle.italic} title="In nghiêng"><i>I</i></TB>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { underline: !selStyle.underline })} active={selStyle.underline} title="Gạch chân"><u>U</u></TB>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { strike: !selStyle.strike })} active={selStyle.strike} title="Gạch ngang"><s>S</s></TB>
+            <TB onClick={() => applyStyleToSelection({ bold: !selStyle.bold })} active={selStyle.bold} title="In đậm"><FiBold size={11} /></TB>
+            <TB onClick={() => applyStyleToSelection({ italic: !selStyle.italic })} active={selStyle.italic} title="In nghiêng"><FiItalic size={11} /></TB>
+            <TB onClick={() => applyStyleToSelection({ underline: !selStyle.underline })} active={selStyle.underline} title="Gạch chân"><FiUnderline size={11} /></TB>
             <Div />
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { align: 'left'   })} active={selStyle.align === 'left'  } title="Căn trái"><FiAlignLeft  size={11} /></TB>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { align: 'center' })} active={selStyle.align === 'center'} title="Căn giữa"><FiAlignCenter size={11} /></TB>
-            <TB onClick={() => setCStyle(sel.ri, sel.ci, { align: 'right'  })} active={selStyle.align === 'right' } title="Căn phải"><FiAlignRight  size={11} /></TB>
+            <TB onClick={() => applyStyleToSelection({ align: 'left'   })} active={selStyle.align === 'left'  } title="Căn trái"><FiAlignLeft   size={11} /></TB>
+            <TB onClick={() => applyStyleToSelection({ align: 'center' })} active={selStyle.align === 'center'} title="Căn giữa"><FiAlignCenter  size={11} /></TB>
+            <TB onClick={() => applyStyleToSelection({ align: 'right'  })} active={selStyle.align === 'right' } title="Căn phải"><FiAlignRight   size={11} /></TB>
             <Div />
             <label title="Màu chữ" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '0.28rem 0.45rem', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '0.77rem', flexShrink: 0 }}>
               <FiType size={11} style={{ color: selStyle.color || '#374151' }} />
-              <input type="color" value={selStyle.color || '#374151'} onChange={e => setCStyle(sel.ri, sel.ci, { color: e.target.value })} style={{ width: '16px', height: '16px', border: 'none', padding: 0, cursor: 'pointer' }} />
+              <input type="color" value={selStyle.color || '#374151'} onChange={e => applyStyleToSelection({ color: e.target.value })} style={{ width: '16px', height: '16px', border: 'none', padding: 0, cursor: 'pointer' }} />
             </label>
             <label title="Màu nền ô" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '0.28rem 0.45rem', border: '1px solid #e2e8f0', borderRadius: '4px', background: selStyle.bg || '#fff', cursor: 'pointer', fontSize: '0.77rem', flexShrink: 0 }}>
               <FiDroplet size={11} />
-              <input type="color" value={selStyle.bg || '#ffffff'} onChange={e => setCStyle(sel.ri, sel.ci, { bg: e.target.value })} style={{ width: '16px', height: '16px', border: 'none', padding: 0, cursor: 'pointer' }} />
+              <input type="color" value={selStyle.bg || '#ffffff'} onChange={e => applyStyleToSelection({ bg: e.target.value })} style={{ width: '16px', height: '16px', border: 'none', padding: 0, cursor: 'pointer' }} />
             </label>
             <Div />
           </>
         )}
 
         {/* Hàng / cột */}
-        <TB onClick={addRow} title="Thêm hàng"><FiPlus size={11} /> Hàng</TB>
-        <TB onClick={addCol} title="Thêm cột"><FiPlus size={11} /> Cột</TB>
-        {sel && <TB onClick={() => duplicateRow(sel.ri)} title="Nhân bản hàng đang chọn"><FiCopy size={11} /> Nhân hàng</TB>}
+        <TB onClick={() => addRow(selStart ? selStart.ri + 1 : rows.length)} title="Chèn hàng (sau hàng đang chọn)"><FiPlusSquare size={11} /> Hàng</TB>
+        <TB onClick={() => addCol(selStart ? selStart.ci + 1 : headers.length)} title="Chèn cột (sau cột đang chọn)"><FiPlusSquare size={11} /> Cột</TB>
+        {selStart && <TB onClick={() => duplicateRow(selStart.ri)} title="Nhân bản hàng"><FiCopy size={11} /> Nhân hàng</TB>}
+        {selStart && <TB onClick={() => removeRow(selStart.ri)} danger title="Xóa hàng đang chọn"><FiMinusSquare size={11} /> Xóa hàng</TB>}
+        {selStart && <TB onClick={() => removeCol(selStart.ci)} danger title="Xóa cột đang chọn"><FiMinusSquare size={11} /> Xóa cột</TB>}
 
         <Div />
 
-        {/* CSV */}
-        <label title="Import từ CSV" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '0.28rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#374151', flexShrink: 0 }}>
-          📥 CSV<input type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCsvImport} />
+        {/* Gộp / Tách */}
+        <TB onClick={mergeSelection} disabled={!hasMulti} title="Gộp các ô đã chọn"><FiSquare size={11} /> Gộp ô</TB>
+        <TB onClick={unmergeSelection} disabled={!selStart} title="Tách ô đã gộp"><FiColumns size={11} /> Tách ô</TB>
+
+        <Div />
+
+        {/* Viền */}
+        <div style={{ position: 'relative' }}>
+          <TB onClick={() => setBorderPopup(v => !v)} active={borderPopup} title="Chỉnh viền bảng"><FiBorderAll size={11} /> Viền</TB>
+          {borderPopup && (
+            <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 999, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '0.75rem', minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Viền bảng</p>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.78rem', color: '#374151', width: '50px' }}>Màu</label>
+                <input type="color" value={borderColor} onChange={e => setBorderColor(e.target.value)} style={{ width: '32px', height: '26px', border: 'none', cursor: 'pointer' }} />
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{borderColor}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.78rem', color: '#374151', width: '50px' }}>Độ dày</label>
+                <select value={borderWidth} onChange={e => setBorderWidth(e.target.value)} style={{ flex: 1, padding: '0.3rem', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '0.78rem' }}>
+                  <option value="0px">Không viền</option>
+                  <option value="1px">1px — Mỏng</option>
+                  <option value="2px">2px — Vừa</option>
+                  <option value="3px">3px — Đậm</option>
+                  <option value="4px">4px — Rất đậm</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.78rem', color: '#374151', width: '50px' }}>Kiểu</label>
+                <select value={borderStroke} onChange={e => setBorderStroke(e.target.value)} style={{ flex: 1, padding: '0.3rem', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '0.78rem' }}>
+                  <option value="solid">Liền (solid)</option>
+                  <option value="dashed">Nét đứt (dashed)</option>
+                  <option value="dotted">Chấm (dotted)</option>
+                  <option value="double">Đôi (double)</option>
+                  <option value="none">Ẩn viền</option>
+                </select>
+              </div>
+              {/* Preview */}
+              <div style={{ border: cellBorder, borderRadius: '4px', padding: '0.4rem 0.75rem', fontSize: '0.78rem', color: '#374151', textAlign: 'center', marginTop: '2px' }}>Xem trước viền</div>
+              <div style={{ display: 'flex', gap: '0.375rem', marginTop: '2px' }}>
+                <button type="button" onClick={applyBorder} style={{ flex: 1, padding: '0.4rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>Áp dụng</button>
+                <button type="button" onClick={() => setBorderPopup(false)} style={{ padding: '0.4rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}>Đóng</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Div />
+
+        {/* Import Excel / CSV */}
+        <label title="Import từ Excel (.xlsx) hoặc CSV (.csv)" style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '0.28rem 0.5rem', border: '1px solid #e2e8f0', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, color: '#374151', flexShrink: 0 }}>
+          <FiDownload size={11} /> Excel/CSV
+          <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileInput} />
         </label>
 
         <Div />
 
-        {/* ── NHÂN BẢN BẢNG ── */}
-        <TB onClick={handleCopyTable} title="Sao chép bảng này vào clipboard (nhấn Dán ở bảng khác để áp dụng)">
-          <FiCopy size={11} /> Sao chép bảng
-        </TB>
-        {/* Nút DÁN — chỉ hiện khi clipboard có dữ liệu */}
-        {_tableCopied && (
+        {/* Sao chép / Dán bảng */}
+        <TB onClick={handleCopyTable} title="Sao chép bảng này"><FiCopy size={11} /> Sao chép</TB>
+        {hasCopy && (
           <div style={{ position: 'relative' }}>
-            <TB onClick={() => setCopyPopup(p => p ? null : {})} active={!!copyPopup} title="Dán bảng đã sao chép vào đây">
-              📋 Dán bảng
-            </TB>
-            {copyPopup !== null && (
+            <TB onClick={() => setCopyPopup(v => !v)} active={copyPopup} title="Dán bảng đã sao chép"><FiClipboard size={11} /> Dán</TB>
+            {copyPopup && (
               <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 999, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '0.625rem', minWidth: '210px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <p style={{ margin: '0 0 5px', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Chọn cách dán:</p>
-                <button type="button" onClick={() => handlePasteAction('replace')} style={{ padding: '0.45rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>
-                  🔁 Đè toàn bộ bảng
-                </button>
-                <button type="button" onClick={() => handlePasteAction('append')} style={{ padding: '0.45rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>
-                  ⬇ Thêm hàng vào cuối bảng
-                </button>
-                {sel && (
-                  <button type="button" onClick={() => handlePasteAction('from_cell')} style={{ padding: '0.45rem 0.75rem', border: '1px solid #bfdbfe', borderRadius: '7px', background: '#eff6ff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>
-                    📌 Dán từ ô [{sel.ri + 1},{sel.ci + 1}]
+                <p style={{ margin: '0 0 4px', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Chọn cách dán:</p>
+                <button type="button" onClick={() => handlePasteAction('replace')} style={{ padding: '0.4rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>🔁 Đè toàn bộ bảng</button>
+                <button type="button" onClick={() => handlePasteAction('append')} style={{ padding: '0.4rem 0.75rem', border: '1px solid #e2e8f0', borderRadius: '7px', background: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>⬇ Thêm hàng vào cuối</button>
+                {selStart && (
+                  <button type="button" onClick={() => handlePasteAction('from_cell')} style={{ padding: '0.4rem 0.75rem', border: '1px solid #bfdbfe', borderRadius: '7px', background: '#eff6ff', cursor: 'pointer', textAlign: 'left', fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>
+                    📌 Dán từ ô [{selStart.ri+1},{selStart.ci+1}]
                   </button>
                 )}
-                <button type="button" onClick={() => setCopyPopup(null)} style={{ padding: '0.35rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.78rem', color: '#94a3b8', marginTop: '2px' }}>Đóng</button>
+                <button type="button" onClick={() => setCopyPopup(false)} style={{ padding: '0.3rem', border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.75rem', color: '#94a3b8' }}>Đóng</button>
               </div>
             )}
           </div>
         )}
-        {/* Nhân bản thành mục nội dung mới */}
-        {onDuplicateSection && (
-          <TB onClick={onDuplicateSection} title="Nhân bản toàn bộ mục bảng này thành mục mới">
-            <FiLayers size={11} /> Nhân mục
-          </TB>
-        )}
+
+        {onDuplicateSection && <TB onClick={onDuplicateSection} title="Nhân bản mục bảng này"><FiLayers size={11} /> Nhân mục</TB>}
       </div>
 
+      {/* Hint chọn nhiều ô */}
+      {hasMulti && (
+        <div style={{ fontSize: '0.72rem', color: '#6366f1', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', padding: '0.3rem 0.75rem', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <FiGrid size={11} /> Đang chọn {(range.r1-range.r0+1)} hàng × {(range.c1-range.c0+1)} cột — toolbar áp định dạng cho tất cả ô
+        </div>
+      )}
+
       {/* ── Table ── */}
-      <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1.5px solid #e2e8f0' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'auto' }}>
+      <div style={{ overflowX: 'auto', borderRadius: '10px', border: cellBorder || '1.5px solid #e2e8f0' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'auto', userSelect: 'none' }}>
           {showHeader && (
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9' }}>
-                {/* Ô điều khiển hàng */}
-                <th style={{ width: '28px', padding: '0.25rem', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0' }} />
-                {/* STT col */}
-                {autoNumber && <th style={{ width: '36px', padding: '0.3rem', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textAlign: 'center' }}>#</th>}
+                <th style={{ width: '28px', padding: '0.25rem', borderRight: cellBorder, borderBottom: cellBorder }} />
+                {autoNumber && <th style={{ width: '32px', padding: '0.3rem', textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', borderRight: cellBorder, borderBottom: cellBorder }}>#</th>}
                 {headers.map((h, ci) => (
-                  <th key={ci} style={{ padding: '0.3rem 0.4rem', borderBottom: '2px solid #e2e8f0', borderRight: '1px solid #e8edf2', minWidth: `${CELL_MIN_W}px` }}>
+                  <th key={ci} style={{ padding: '0.3rem 0.4rem', borderBottom: cellBorder, borderRight: cellBorder, minWidth: '120px', cursor: 'pointer' }}
+                    onClick={() => selectCol(ci)}>
                     <div style={{ display: 'flex', gap: '2px', marginBottom: '3px', justifyContent: 'center' }}>
-                      <button type="button" onClick={() => moveCol(ci, -1)} disabled={ci === 0} style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.6rem', opacity: ci === 0 ? 0.3 : 1 }}>←</button>
-                      <button type="button" onClick={() => moveCol(ci,  1)} disabled={ci === headers.length - 1} style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.6rem', opacity: ci === headers.length - 1 ? 0.3 : 1 }}>→</button>
-                      <button type="button" onClick={() => removeCol(ci)} disabled={headers.length <= 1} style={{ padding: '1px 4px', border: '1px solid #fecaca', borderRadius: '3px', background: '#fff', cursor: 'pointer', color: '#ef4444', fontSize: '0.6rem', opacity: headers.length <= 1 ? 0.3 : 1 }}>✕</button>
+                      <button type="button" onClick={e => { e.stopPropagation(); moveCol(ci, -1); }} disabled={ci === 0} style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.58rem', opacity: ci === 0 ? 0.3 : 1 }}><FiChevronLeft size={9} /></button>
+                      <button type="button" onClick={e => { e.stopPropagation(); moveCol(ci,  1); }} disabled={ci === headers.length-1} style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.58rem', opacity: ci === headers.length-1 ? 0.3 : 1 }}><FiChevronRight size={9} /></button>
+                      <button type="button" onClick={e => { e.stopPropagation(); addCol(ci + 1); }} title="Chèn cột bên phải" style={{ padding: '1px 4px', border: '1px solid #bfdbfe', borderRadius: '3px', background: '#eff6ff', cursor: 'pointer', color: '#2563eb', fontSize: '0.58rem' }}><FiPlus size={8} /></button>
+                      <button type="button" onClick={e => { e.stopPropagation(); removeCol(ci); }} disabled={headers.length <= 1} style={{ padding: '1px 4px', border: '1px solid #fecaca', borderRadius: '3px', background: '#fff', cursor: 'pointer', color: '#ef4444', fontSize: '0.58rem', opacity: headers.length <= 1 ? 0.3 : 1 }}><FiMinus size={8} /></button>
                     </div>
-                    <input value={h} onChange={e => updateHeader(ci, e.target.value)}
-                      style={{ width: '100%', padding: '0.3rem 0.4rem', border: '1px solid #cbd5e1', borderRadius: '5px', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
+                    <input value={h} onChange={e => updateHeader(ci, e.target.value)} onClick={e => e.stopPropagation()}
+                      style={{ width: '100%', padding: '0.25rem 0.35rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center', boxSizing: 'border-box', outline: 'none', background: '#fff' }} />
                   </th>
                 ))}
               </tr>
@@ -334,42 +527,37 @@ function TableEditor({ tableData, onChange, onDuplicateSection }) {
           )}
           <tbody>
             {rows.map((row, ri) => (
-              <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
-                {/* Row controls */}
-                <td style={{ padding: '0.2rem', borderRight: '1px solid #f1f5f9', verticalAlign: 'middle', width: '28px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
-                    <button type="button" onClick={() => moveRow(ri, -1)} disabled={ri === 0} title="Lên" style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.58rem', opacity: ri === 0 ? 0.3 : 1 }}>↑</button>
-                    <button type="button" onClick={() => moveRow(ri,  1)} disabled={ri === rows.length - 1} title="Xuống" style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.58rem', opacity: ri === rows.length - 1 ? 0.3 : 1 }}>↓</button>
-                    <button type="button" onClick={() => duplicateRow(ri)} title="Nhân bản hàng" style={{ padding: '1px 4px', border: '1px solid #e2e8f0', borderRadius: '3px', background: '#fff', cursor: 'pointer', fontSize: '0.58rem' }}>⎘</button>
-                    <button type="button" onClick={() => removeRow(ri)} disabled={rows.length <= 1} title="Xóa hàng" style={{ padding: '1px 4px', border: '1px solid #fecaca', borderRadius: '3px', background: '#fff', cursor: 'pointer', color: '#ef4444', fontSize: '0.58rem', opacity: rows.length <= 1 ? 0.3 : 1 }}>✕</button>
+              <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
+                {/* Row control */}
+                <td style={{ padding: '0.15rem', borderRight: cellBorder, borderBottom: cellBorder, verticalAlign: 'middle', width: '28px', cursor: 'pointer', backgroundColor: '#f8fafc' }}
+                  onClick={() => selectRow(ri)}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'center' }}>
+                    <button type="button" onClick={e => { e.stopPropagation(); moveRow(ri, -1); }} disabled={ri === 0} style={{ padding: '1px 3px', border: 'none', background: 'none', cursor: 'pointer', opacity: ri === 0 ? 0.3 : 0.6, color: '#64748b' }}><FiChevronUp size={9} /></button>
+                    <button type="button" onClick={e => { e.stopPropagation(); addRow(ri + 1); }} title="Chèn hàng bên dưới" style={{ padding: '1px 3px', border: 'none', background: 'none', cursor: 'pointer', opacity: 0.7, color: '#2563eb' }}><FiPlus size={9} /></button>
+                    <button type="button" onClick={e => { e.stopPropagation(); moveRow(ri,  1); }} disabled={ri === rows.length-1} style={{ padding: '1px 3px', border: 'none', background: 'none', cursor: 'pointer', opacity: ri === rows.length-1 ? 0.3 : 0.6, color: '#64748b' }}><FiChevronDown size={9} /></button>
+                    <button type="button" onClick={e => { e.stopPropagation(); duplicateRow(ri); }} title="Nhân bản hàng" style={{ padding: '1px 3px', border: 'none', background: 'none', cursor: 'pointer', opacity: 0.6, color: '#6366f1' }}><FiCopy size={8} /></button>
+                    <button type="button" onClick={e => { e.stopPropagation(); removeRow(ri); }} disabled={rows.length <= 1} style={{ padding: '1px 3px', border: 'none', background: 'none', cursor: 'pointer', opacity: rows.length <= 1 ? 0.2 : 0.6, color: '#ef4444' }}><FiMinus size={8} /></button>
                   </div>
                 </td>
                 {/* STT */}
-                {autoNumber && (
-                  <td style={{ padding: '0.3rem 0.4rem', textAlign: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', borderRight: '1px solid #f1f5f9', verticalAlign: 'middle' }}>{ri + 1}</td>
-                )}
+                {autoNumber && <td style={{ padding: '0.3rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', borderRight: cellBorder, borderBottom: cellBorder, verticalAlign: 'middle', backgroundColor: '#f8fafc' }}>{ri + 1}</td>}
                 {row.map((cell, ci) => {
                   const cs = getCStyle(ri, ci);
-                  const isSelected = sel && sel.ri === ri && sel.ci === ci;
+                  const mg = merges[`${ri}_${ci}`];
+                  if (mg?.hidden) return null; // gộp ô — ẩn
+                  const isInSel = inRange(ri, ci);
                   return (
-                    <td key={ci} style={{ padding: '0.2rem', verticalAlign: 'top', borderRight: '1px solid #f1f5f9' }}>
-                      <textarea
-                        value={cell}
-                        onChange={e => updateCell(ri, ci, e.target.value)}
-                        onFocus={() => setSelected({ ri, ci })}
+                    <td key={ci}
+                      rowSpan={mg?.rowspan || 1} colSpan={mg?.colspan || 1}
+                      style={{ padding: '0.15rem', verticalAlign: 'top', borderRight: cellBorder, borderBottom: cellBorder, backgroundColor: isInSel ? 'rgba(147,197,253,0.18)' : (cs.bg || 'transparent'), outline: isInSel ? '2px solid #2563eb' : 'none', outlineOffset: '-2px', boxSizing: 'border-box' }}
+                      onMouseDown={() => { setSelStart({ ri, ci }); setSelEnd({ ri, ci }); setIsSelecting(true); }}
+                      onMouseEnter={() => { if (isSelecting) setSelEnd({ ri, ci }); }}
+                      onMouseUp={() => setIsSelecting(false)}
+                    >
+                      <textarea value={cell} onChange={e => updateCell(ri, ci, e.target.value)}
+                        onFocus={() => { if (!isSelecting) { setSelStart({ ri, ci }); setSelEnd({ ri, ci }); } }}
                         rows={2}
-                        style={{
-                          width: '100%', padding: '0.35rem 0.5rem',
-                          border: `1.5px solid ${isSelected ? '#93c5fd' : '#e2e8f0'}`,
-                          borderRadius: '5px', fontSize: '0.82rem', resize: 'vertical',
-                          outline: 'none', fontFamily: 'inherit', lineHeight: '1.5',
-                          boxSizing: 'border-box', minHeight: '44px',
-                          backgroundColor: cs.bg || '#fff', color: cs.color || '#374151',
-                          fontWeight: cs.bold ? 700 : 400, fontStyle: cs.italic ? 'italic' : 'normal',
-                          textDecoration: cs.underline ? 'underline' : cs.strike ? 'line-through' : 'none',
-                          textAlign: cs.align || 'left',
-                        }}
-                      />
+                        style={{ width: '100%', padding: '0.35rem 0.5rem', border: 'none', outline: 'none', fontSize: '0.82rem', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.55', boxSizing: 'border-box', minHeight: '44px', background: 'transparent', color: cs.color || '#374151', fontWeight: cs.bold ? 700 : 400, fontStyle: cs.italic ? 'italic' : 'normal', textDecoration: cs.underline ? 'underline' : 'none', textAlign: cs.align || 'left' }} />
                     </td>
                   );
                 })}
@@ -378,13 +566,35 @@ function TableEditor({ tableData, onChange, onDuplicateSection }) {
           </tbody>
         </table>
       </div>
-      {sel && <p style={{ fontSize: '0.71rem', color: '#94a3b8', margin: '0.3rem 0 0', fontStyle: 'italic' }}>Ô [{sel.ri+1},{sel.ci+1}] đang chọn — dùng toolbar để định dạng hoặc nhấn "Dán từ ô" để paste</p>}
+
+      {selStart && !hasMulti && <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '0.25rem 0 0', fontStyle: 'italic' }}>Ô [{selStart.ri+1},{selStart.ci+1}] — kéo chuột hoặc Shift+click để chọn nhiều</p>}
+
+      {/* Phân tích / ghi chú */}
+      <AnalysisEditor value={analysisText} onChange={onAnalysisChange} onUploadImage={onUploadImage} />
+
+      {/* Popup xác nhận import */}
+      {importPopup === 'confirm' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', width: '360px', maxWidth: '95vw', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h4 style={{ margin: '0 0 0.75rem', fontSize: '1rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '7px' }}>
+              <FiAlertTriangle size={18} color="#f59e0b" /> Bảng đã có dữ liệu
+            </h4>
+            <p style={{ margin: '0 0 1.25rem', fontSize: '0.875rem', color: '#475569', lineHeight: '1.6' }}>
+              Bảng hiện tại đang có dữ liệu. Import sẽ thay thế toàn bộ nội dung. Bạn vẫn có thể <strong>Ctrl+Z</strong> để hoàn tác sau khi import.
+            </p>
+            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => { setImportPopup(null); setPendingFile(null); }} style={{ padding: '0.6rem 1.25rem', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', cursor: 'pointer', fontWeight: 700, fontSize: '0.875rem', color: '#475569' }}>Hủy</button>
+              <button type="button" onClick={() => doImport(pendingFile)} style={{ padding: '0.6rem 1.25rem', border: 'none', borderRadius: '8px', background: '#2563eb', cursor: 'pointer', fontWeight: 700, fontSize: '0.875rem', color: '#fff' }}>Import & Ghi đè</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* ═══════════ CHART EDITOR ═══════════ */
-function ChartEditor({ sec, upd, onDuplicateSection }) {
+function ChartEditor({ sec, upd, onDuplicateSection, handleUpload }) {
   const [showCsvInput, setShowCsvInput] = useState(false);
   const [csvText, setCsvText] = useState('');
   const COLORS_PRESET = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
@@ -491,12 +701,15 @@ function ChartEditor({ sec, upd, onDuplicateSection }) {
         style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.45rem 0.875rem', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', width: 'fit-content' }}>
         <FiPlus size={12} /> Thêm mục dữ liệu
       </button>
+
+      {/* Phân tích / Ghi chú biểu đồ */}
+      <AnalysisEditor value={sec.analysisText || ''} onChange={val => upd({ analysisText: val })} onUploadImage={handleUpload} />
     </div>
   );
 }
 
-/* ═══════════ IMAGE BLOCK (upload, thay ảnh, đổi thứ tự) ═══════════ */
-function ImageBlock({ images = [], onChange, handleUpload }) {
+/* ═══════════ IMAGE BLOCK ═══════════ */
+function ImageBlock({ images = [], onChange, handleUpload, analysisText, onAnalysisChange }) {
   const moveImg = (idx, dir) => {
     const ni = idx + dir; if (ni < 0 || ni >= images.length) return;
     const arr = [...images]; [arr[idx], arr[ni]] = [arr[ni], arr[idx]]; onChange(arr);
@@ -510,42 +723,37 @@ function ImageBlock({ images = [], onChange, handleUpload }) {
     if (res?.url) updateImg(idx, { url: res.url });
   };
   const addImgs = async (files) => {
+    const newImgs = [...images];
     for (const f of Array.from(files)) {
       const res = await handleUpload(f);
-      if (res?.url) onChange([...images, { url: res.url, caption: '', align: 'center', width: '100%' }]);
+      if (res?.url) newImgs.push({ url: res.url, caption: '', align: 'center', width: '100%' });
     }
+    onChange(newImgs);
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
       {images.map((img, idx) => (
         <div key={idx} style={{ border: '1.5px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-          {/* Preview */}
           <div style={{ position: 'relative' }}>
             <img src={img.url} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', display: 'block', backgroundColor: '#f0f4f8' }} />
-            {/* Controls overlay */}
             <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '4px' }}>
-              {/* Thứ tự */}
-              <button type="button" onClick={() => moveImg(idx, -1)} disabled={idx === 0} title="Lên" style={{ padding: '4px 7px', background: 'rgba(30,41,59,0.7)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem', opacity: idx === 0 ? 0.4 : 1 }}>↑</button>
-              <button type="button" onClick={() => moveImg(idx,  1)} disabled={idx === images.length - 1} title="Xuống" style={{ padding: '4px 7px', background: 'rgba(30,41,59,0.7)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '0.7rem', opacity: idx === images.length - 1 ? 0.4 : 1 }}>↓</button>
+              <button type="button" onClick={() => moveImg(idx, -1)} disabled={idx === 0} title="Lên" style={{ padding: '4px 7px', background: 'rgba(30,41,59,0.7)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', opacity: idx === 0 ? 0.4 : 1, display: 'flex', alignItems: 'center' }}><FiChevronUp size={13} /></button>
+              <button type="button" onClick={() => moveImg(idx,  1)} disabled={idx === images.length - 1} title="Xuống" style={{ padding: '4px 7px', background: 'rgba(30,41,59,0.7)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', opacity: idx === images.length - 1 ? 0.4 : 1, display: 'flex', alignItems: 'center' }}><FiChevronDown size={13} /></button>
             </div>
             <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
-              {/* Thay ảnh */}
               <label title="Thay ảnh này" style={{ padding: '4px 7px', background: 'rgba(37,99,235,0.85)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                 <FiRefreshCw size={13} />
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files[0]) replaceImg(idx, e.target.files[0]); e.target.value = ''; }} />
               </label>
-              {/* Xóa */}
               <button type="button" onClick={() => removeImg(idx)} title="Xóa ảnh" style={{ padding: '4px 7px', background: 'rgba(239,68,68,0.9)', border: 'none', color: '#fff', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                 <FiX size={13} />
               </button>
             </div>
-            {/* STT badge */}
             <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(30,41,59,0.65)', color: '#fff', fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
               {idx + 1}/{images.length}
             </div>
           </div>
-          {/* Meta */}
           <div style={{ padding: '0.625rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <input type="text" placeholder="Caption ảnh..." value={img.caption || ''} onChange={e => updateImg(idx, { caption: e.target.value })}
               style={{ flex: 2, minWidth: '120px', padding: '0.45rem 0.625rem', border: '1px solid #e2e8f0', borderRadius: '7px', fontSize: '0.82rem', outline: 'none' }} />
@@ -565,6 +773,8 @@ function ImageBlock({ images = [], onChange, handleUpload }) {
         <FiUploadCloud size={16} color="#2563eb" /> Tải thêm ảnh
         <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files.length) addImgs(e.target.files); e.target.value = ''; }} />
       </label>
+      {/* Phân tích / Ghi chú */}
+      <AnalysisEditor value={analysisText} onChange={onAnalysisChange} onUploadImage={handleUpload} />
     </div>
   );
 }
@@ -691,15 +901,20 @@ function SectionEditor({
               images={sec.images || []}
               onChange={imgs => upd({ images: imgs })}
               handleUpload={handleUpload}
+              analysisText={sec.analysisText || ''}
+              onAnalysisChange={val => upd({ analysisText: val })}
             />
           )}
 
           {/* TABLE */}
           {sec.type === 'table' && (
             <TableEditor
-              tableData={sec.tableData || { headers: [], rows: [['']], showHeader: true, autoNumber: false, cellStyles: {} }}
+              tableData={sec.tableData || { headers: [], rows: [['']], showHeader: true, autoNumber: false, cellStyles: {}, merges: {}, borderStyle: {} }}
               onChange={tableData => upd({ tableData })}
               onDuplicateSection={() => onDuplicate(sec)}
+              onUploadImage={handleUpload}
+              analysisText={sec.analysisText || ''}
+              onAnalysisChange={val => upd({ analysisText: val })}
             />
           )}
 
@@ -730,7 +945,7 @@ function SectionEditor({
 
           {/* CHART */}
           {sec.type === 'chart' && (
-            <ChartEditor sec={sec} upd={upd} onDuplicateSection={() => onDuplicate(sec)} />
+            <ChartEditor sec={sec} upd={upd} onDuplicateSection={() => onDuplicate(sec)} handleUpload={handleUpload} />
           )}
         </div>
       )}

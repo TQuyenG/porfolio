@@ -63,6 +63,15 @@ function Lightbox({ list, index, onClose, onPrev, onNext }) {
 /* ═══════════════════════════════════════════════════
    BLOCK RENDERERS
 ═══════════════════════════════════════════════════ */
+/* ── Analysis text block (dùng chung cho image/chart/table) ── */
+function AnalysisBlock({ html }) {
+  if (!html) return null;
+  return (
+    <div className="rich-content analysis-block" style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#374151', lineHeight: '1.8' }}
+      dangerouslySetInnerHTML={{ __html: html }} />
+  );
+}
+
 function TextBlock({ sec }) {
   return (
     <div className="rich-content" style={{ color: '#374151', fontSize: '0.975rem', lineHeight: '1.85' }}
@@ -79,10 +88,8 @@ function ImageBlock({ sec, onOpenLightbox }) {
         const textAlign = align === 'full' ? 'center' : align;
         return (
           <figure key={idx} style={{ margin: 0, textAlign }}>
-            <div
-              style={{ display: 'inline-block', position: 'relative', cursor: 'zoom-in', maxWidth: '100%' }}
-              onClick={() => onOpenLightbox((sec.images || []).map(i => i.url), idx)}
-            >
+            <div style={{ display: 'inline-block', position: 'relative', cursor: 'zoom-in', maxWidth: '100%' }}
+              onClick={() => onOpenLightbox((sec.images || []).map(i => i.url), idx)}>
               <img src={img.url} alt={img.caption || ''}
                 style={{ width: align === 'full' ? '100%' : imgWidth, maxWidth: '100%', borderRadius: '12px', display: 'block', border: '1px solid #e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }} />
               <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(15,23,42,0.7)', color: '#fff', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -90,12 +97,13 @@ function ImageBlock({ sec, onOpenLightbox }) {
               </div>
             </div>
             {img.caption && (
-              <figcaption style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem', lineHeight: '1.5', fontStyle: 'italic', borderLeft: align === 'left' ? '3px solid #2563eb' : 'none', paddingLeft: align === 'left' ? '0.75rem' : 0 }}
+              <figcaption style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem', lineHeight: '1.5', fontStyle: 'italic' }}
                 dangerouslySetInnerHTML={{ __html: img.caption }} />
             )}
           </figure>
         );
       })}
+      <AnalysisBlock html={sec.analysisText} />
     </div>
   );
 }
@@ -106,6 +114,7 @@ function TableBlock({ sec }) {
   const getCStyle = (ri, ci) => cellStyles[`${ri}_${ci}`] || {};
 
   return (
+  <div>
     <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', minWidth: `${Math.max(headers.length * 140, 320)}px` }}>
         {/* Chỉ hiện thead nếu showHeader=true VÀ headers có nội dung thực sự (không phải "Cột 1, Cột 2...") */}
@@ -152,6 +161,8 @@ function TableBlock({ sec }) {
         </tbody>
       </table>
     </div>
+    <AnalysisBlock html={sec.analysisText} />
+  </div>
   );
 }
 
@@ -340,20 +351,23 @@ function ChartBlock({ sec }) {
 
   // Waterfall / Scatter / Bubble → fallback to bar
   return (
-    <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem 2rem', backgroundColor: '#fff' }}>
-      {sec.chartTitle && <h4 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>{sec.chartTitle}</h4>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxWidth: '560px', margin: '0 auto' }}>
-        {data.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-            <div style={{ width: '110px', fontSize: '0.82rem', fontWeight: 600, color: '#4b5563', textAlign: 'right', flexShrink: 0 }}>{item.label}</div>
-            <div style={{ flex: 1, backgroundColor: '#f1f5f9', height: '24px', borderRadius: '6px', overflow: 'hidden' }}>
-              <div style={{ width: `${(Math.abs(item.value) / max) * 100}%`, height: '100%', backgroundColor: getColor(item, i), borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', transition: 'width 1.2s ease' }}>
-                {showValues && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 700 }}>{item.value}</span>}
+    <div>
+      <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem 2rem', backgroundColor: '#fff' }}>
+        {sec.chartTitle && <h4 style={{ margin: '0 0 1.25rem', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', textAlign: 'center' }}>{sec.chartTitle}</h4>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', maxWidth: '560px', margin: '0 auto' }}>
+          {data.map((item, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+              <div style={{ width: '110px', fontSize: '0.82rem', fontWeight: 600, color: '#4b5563', textAlign: 'right', flexShrink: 0 }}>{item.label}</div>
+              <div style={{ flex: 1, backgroundColor: '#f1f5f9', height: '24px', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ width: `${(Math.abs(item.value) / max) * 100}%`, height: '100%', backgroundColor: getColor(item, i), borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', transition: 'width 1.2s ease' }}>
+                  {showValues && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 700 }}>{item.value}</span>}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+      <AnalysisBlock html={sec.analysisText} />
     </div>
   );
 }
