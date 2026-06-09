@@ -1,0 +1,1 @@
+{"version":3,"file":"static/js/499.e67538a1.chunk.js","mappings":"yGAAAA,EAAAC,QAAAC,OAAA","sources":["../external module \"https:/cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js\""],"sourcesContent":["module.exports = import(\"https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js\");;"],"names":["module","exports","import"],"sourceRoot":""}

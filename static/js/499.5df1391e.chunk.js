@@ -1,0 +1,2 @@
+"use strict";(globalThis.webpackChunkportfolio=globalThis.webpackChunkportfolio||[]).push([[499],{499(o){o.exports=import("https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js")}}]);
+//# sourceMappingURL=499.5df1391e.chunk.js.map
