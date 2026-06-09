@@ -281,15 +281,24 @@ function TableEditor({ tableData, onChange, onDuplicateSection, onUploadImage, a
     update({ merges: newMerges });
   };
 
+  /* ── Load XLSX library via script tag (tránh lỗi ES module với dynamic import) ── */
+  const loadXLSX = () => new Promise((resolve, reject) => {
+    if (window.XLSX) { resolve(window.XLSX); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX không khởi tạo được'));
+    script.onerror = () => reject(new Error('Không tải được thư viện xlsx'));
+    document.head.appendChild(script);
+  });
+
   /* ── Import Excel / CSV ── */
   const doImport = async (file) => {
     const ext = file.name.split('.').pop().toLowerCase();
     if (ext === 'xlsx' || ext === 'xls') {
       try {
-        const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js').catch(() => null);
-        if (!XLSX) { alert('Không tải được thư viện xlsx. Hãy dùng CSV.'); return; }
+        const XLSX = await loadXLSX();
         const buf = await file.arrayBuffer();
-        const wb  = XLSX.read(buf, { type: 'array' });
+        const wb  = XLSX.read(new Uint8Array(buf), { type: 'array' });
         const ws  = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         if (raw.length === 0) return;
