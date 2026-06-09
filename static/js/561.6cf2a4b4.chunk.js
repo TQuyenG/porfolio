@@ -1,0 +1,2 @@
+"use strict";(globalThis.webpackChunkportfolio=globalThis.webpackChunkportfolio||[]).push([[561],{561(s){s.exports=import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js")}}]);
+//# sourceMappingURL=561.6cf2a4b4.chunk.js.map
