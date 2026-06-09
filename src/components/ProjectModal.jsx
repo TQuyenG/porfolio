@@ -8,7 +8,7 @@ import {
   FiRefreshCw, FiBold, FiItalic, FiUnderline, FiHash,
   FiRotateCcw, FiRotateCw, FiSquare, FiColumns, FiMinus,
   FiPlusSquare, FiMinusSquare, FiDownload, FiClipboard,
-  FiAlertTriangle, FiFileText, FiBorderAll, FiGrid as FiGridIcon,
+  FiAlertTriangle, FiFileText, FiLayout, FiGrid as FiGridIcon,
 } from 'react-icons/fi';
 import RichTextEditor from './RichTextEditor';
 import { uploadFileToStorage } from '../utils/supabaseClient';
@@ -421,7 +421,7 @@ function TableEditor({ tableData, onChange, onDuplicateSection, onUploadImage, a
 
         {/* Viền */}
         <div style={{ position: 'relative' }}>
-          <TB onClick={() => setBorderPopup(v => !v)} active={borderPopup} title="Chỉnh viền bảng"><FiBorderAll size={11} /> Viền</TB>
+          <TB onClick={() => setBorderPopup(v => !v)} active={borderPopup} title="Chỉnh viền bảng"><FiLayout size={11} /> Viền</TB>
           {borderPopup && (
             <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 999, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: '0.75rem', minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Viền bảng</p>
