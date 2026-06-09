@@ -24,36 +24,80 @@ function buildSectionTree(flat = []) {
 }
 
 /* ═══════════════════════════════════════════════════
-   LIGHTBOX
+   LIGHTBOX — hỗ trợ image / table / chart
 ═══════════════════════════════════════════════════ */
-function Lightbox({ list, index, onClose, onPrev, onNext }) {
+function Lightbox({ list, index, onClose, onPrev, onNext, type = 'image', tableContent, chartContent }) {
   useEffect(() => {
     const h = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') onPrev();
-      if (e.key === 'ArrowRight') onNext();
+      if (e.key === 'ArrowLeft' && type === 'image') onPrev();
+      if (e.key === 'ArrowRight' && type === 'image') onNext();
     };
+    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose, onPrev, onNext]);
+    return () => { window.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose, onPrev, onNext, type]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,10,20,0.97)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,10,20,0.97)', zIndex: 999999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <button onClick={onClose} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
         <FiX />
       </button>
-      {list.length > 1 && (
+
+      {type === 'image' && (
         <>
-          <button onClick={(e) => { e.stopPropagation(); onPrev(); }} style={{ position: 'absolute', left: '1rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FiChevronLeft /></button>
-          <button onClick={(e) => { e.stopPropagation(); onNext(); }} style={{ position: 'absolute', right: '1rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FiChevronRight /></button>
+          {list.length > 1 && (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); onPrev(); }} style={{ position: 'absolute', left: '1rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FiChevronLeft /></button>
+              <button onClick={(e) => { e.stopPropagation(); onNext(); }} style={{ position: 'absolute', right: '1rem', background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', width: '44px', height: '44px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FiChevronRight /></button>
+            </>
+          )}
+          <img src={list[index]} alt="Phóng to" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '88vh', borderRadius: '10px', objectFit: 'contain', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }} />
+          {list.length > 1 && (
+            <div style={{ position: 'absolute', bottom: '1.25rem', display: 'flex', gap: '6px' }}>
+              {list.map((_, i) => <div key={i} style={{ width: i === index ? '20px' : '8px', height: '8px', borderRadius: '4px', backgroundColor: i === index ? '#fff' : 'rgba(255,255,255,0.3)', transition: 'all 0.3s' }} />)}
+            </div>
+          )}
         </>
       )}
-      <img src={list[index]} alt="Phóng to" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '88vh', borderRadius: '10px', objectFit: 'contain', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }} />
-      {list.length > 1 && (
-        <div style={{ position: 'absolute', bottom: '1.25rem', display: 'flex', gap: '6px' }}>
-          {list.map((_, i) => (
-            <div key={i} style={{ width: i === index ? '20px' : '8px', height: '8px', borderRadius: '4px', backgroundColor: i === index ? '#fff' : 'rgba(255,255,255,0.3)', transition: 'all 0.3s' }} />
-          ))}
+
+      {type === 'table' && tableContent && (
+        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(95vw, 1100px)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
+          <div style={{ padding: '0.875rem 1.25rem', backgroundColor: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>📊 {tableContent.title || 'Bảng dữ liệu'}</span>
+            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{tableContent.rows?.length || 0} hàng · {tableContent.headers?.length || 0} cột</span>
+          </div>
+          <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1, backgroundColor: '#fff' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', minWidth: `${Math.max((tableContent.headers?.length || 1) * 160, 400)}px` }}>
+              {tableContent.showHeader && tableContent.headers?.some(h => h && !h.match(/^Cột\s*\d+$/)) && (
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                    {tableContent.headers.map((h, i) => <th key={i} style={{ padding: '0.875rem 1.125rem', textAlign: 'left', color: '#1e293b', fontWeight: 700, fontSize: '0.85rem', position: 'sticky', top: 0, background: '#f1f5f9' }}>{h}</th>)}
+                  </tr>
+                </thead>
+              )}
+              <tbody>
+                {(tableContent.rows || []).map((row, ri) => (
+                  <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                    {row.map((cell, ci) => {
+                      const cs = (tableContent.cellStyles || {})[`${ri}_${ci}`] || {};
+                      return (
+                        <td key={ci} style={{ padding: '0.875rem 1.125rem', verticalAlign: 'top', lineHeight: '1.6', color: cs.color || '#374151', backgroundColor: cs.bg || 'transparent', fontWeight: cs.bold ? 700 : 400, fontStyle: cs.italic ? 'italic' : 'normal', textDecoration: cs.underline ? 'underline' : 'none', textAlign: cs.align || 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {typeof cell === 'string' && cell.includes('<') ? <span dangerouslySetInnerHTML={{ __html: cell }} /> : cell}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {type === 'chart' && chartContent && (
+        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(90vw, 720px)', maxHeight: '88vh', overflowY: 'auto', borderRadius: '14px', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
+          <ChartBlock sec={chartContent} isFullscreen />
         </div>
       )}
     </div>
