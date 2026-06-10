@@ -152,61 +152,115 @@ function ImageBlock({ sec, onOpenLightbox }) {
   );
 }
 
-/* TableBlock — KHÔNG hiện hàng header (Cột 1, Cột 2...), chỉ hiện nội dung */
-function TableBlock({ sec }) {
-  const { headers = [], rows = [], showHeader = true, cellStyles = {} } = sec.tableData || {};
+/* TableBlock — smart column sizing, scroll ngang, zoom lightbox */
+function TableBlock({ sec, onOpenLightbox }) {
+  const { headers = [], rows = [], showHeader = true, cellStyles = {}, title } = sec.tableData || {};
   const getCStyle = (ri, ci) => cellStyles[`${ri}_${ci}`] || {};
 
+  /* ── Tự động nhận diện loại cột để gán width hint ── */
+  const getColWidth = (header = '', colIndex, totalCols) => {
+    const h = header.toLowerCase();
+    // Cột ID ngắn
+    if (h.match(/^(id|#|stt|no\.?|số)$/) || h.match(/^[a-z]{2,4}[\s-]?id$/i)) return '60px';
+    // Cột SP/số
+    if (h.match(/^(sp|point|điểm|số|qty|count)$/)) return '55px';
+    // Cột Priority/Status/Type
+    if (h.match(/(priority|status|loại|type|mức)/)) return '90px';
+    // Cột Dependency/Tag
+    if (h.match(/(depend|tag|label)/)) return '110px';
+    // Cột tên ngắn (Epic, Feature, Feature Name...)
+    if (h.match(/^(epic|feature|module|phase|giai đoạn)$/)) return '120px';
+    // Cột nội dung dài (User Story, Description, Acceptance...)
+    if (h.match(/(story|description|mô tả|acceptance|criteria|ghi chú|note|content|nội dung)/)) return 'auto';
+    // Default: auto
+    return 'auto';
+  };
+
+  const hasRealHeaders = showHeader && headers.some(h => h && !h.match(/^Cột\s*\d+$/));
+  const colCount = Math.max(headers.length, rows[0]?.length || 0, 1);
+
   return (
-  <div>
-    <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', minWidth: `${Math.max(headers.length * 140, 320)}px` }}>
-        {/* Chỉ hiện thead nếu showHeader=true VÀ headers có nội dung thực sự (không phải "Cột 1, Cột 2...") */}
-        {showHeader && headers.some(h => h && !h.match(/^Cột\s*\d+$/)) && (
-          <thead>
-            <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
-              {headers.map((h, i) => (
-                <th key={i} style={{ padding: '0.875rem 1.125rem', textAlign: 'left', color: '#1e293b', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.3px' }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
+    <div>
+      {/* Wrapper: giới hạn trong cột trái, scroll ngang */}
+      <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+        {/* Nút zoom */}
+        {onOpenLightbox && rows.length > 0 && (
+          <button
+            onClick={() => onOpenLightbox({ headers, rows, showHeader, cellStyles, title }, 'table')}
+            title="Xem toàn màn hình"
+            style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 5, background: 'rgba(30,41,59,0.75)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <FiMaximize2 size={13} />
+          </button>
         )}
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#fafbfc' }}>
-              {row.map((cell, ci) => {
-                const cs = getCStyle(ri, ci);
-                return (
-                  <td key={ci} style={{
-                    padding: '0.875rem 1.125rem', verticalAlign: 'top', lineHeight: '1.6',
-                    color: cs.color || '#374151', backgroundColor: cs.bg || 'transparent',
-                    fontWeight: cs.bold ? 700 : 400, fontStyle: cs.italic ? 'italic' : 'normal',
-                    textDecoration: cs.underline ? 'underline' : cs.strike ? 'line-through' : 'none',
-                    textAlign: cs.align || 'left',
-                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                  }}>
-                    {typeof cell === 'string' && cell.includes('<')
-                      ? <span dangerouslySetInnerHTML={{ __html: cell }} />
-                      : cell}
+        <div style={{ overflowX: 'auto', overflowY: 'visible', WebkitOverflowScrolling: 'touch', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: '0.875rem', width: '100%', tableLayout: 'auto' }}>
+            {hasRealHeaders && (
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #e2e8f0' }}>
+                  {headers.map((h, i) => (
+                    <th key={i} style={{
+                      padding: '0.75rem 0.875rem',
+                      textAlign: 'left',
+                      color: '#1e293b',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      letterSpacing: '0.3px',
+                      whiteSpace: 'nowrap',
+                      width: getColWidth(h, i, colCount),
+                    }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ri % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                  {row.map((cell, ci) => {
+                    const cs = getCStyle(ri, ci);
+                    const hdr = headers[ci] || '';
+                    const w = getColWidth(hdr, ci, colCount);
+                    // Cột "auto" (nội dung dài): wrap bình thường. Cột nhỏ: nowrap
+                    const isLongCol = w === 'auto';
+                    return (
+                      <td key={ci} style={{
+                        padding: '0.75rem 0.875rem',
+                        verticalAlign: 'top',
+                        lineHeight: '1.6',
+                        color: cs.color || '#374151',
+                        backgroundColor: cs.bg || 'transparent',
+                        fontWeight: cs.bold ? 700 : 400,
+                        fontStyle: cs.italic ? 'italic' : 'normal',
+                        textDecoration: cs.underline ? 'underline' : cs.strike ? 'line-through' : 'none',
+                        textAlign: cs.align || 'left',
+                        whiteSpace: isLongCol ? 'pre-wrap' : 'normal',
+                        wordBreak: isLongCol ? 'break-word' : 'normal',
+                        maxWidth: isLongCol ? '340px' : undefined,
+                        minWidth: w !== 'auto' ? w : '80px',
+                      }}>
+                        {typeof cell === 'string' && cell.includes('<')
+                          ? <span dangerouslySetInnerHTML={{ __html: cell }} />
+                          : cell}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={Math.max(colCount, 1)} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>
+                    Chưa có dữ liệu
                   </td>
-                );
-              })}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={Math.max(headers.length, 1)} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>
-                Chưa có dữ liệu
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <AnalysisBlock html={sec.analysisText} />
     </div>
-    <AnalysisBlock html={sec.analysisText} />
-  </div>
   );
 }
 
@@ -538,7 +592,7 @@ function SectionRenderer({ sec, isChild, onOpenLightbox }) {
       {sec.type === 'image' && (sec.images || []).length > 0 && (
         <ImageBlock sec={sec} onOpenLightbox={(list, idx) => onOpenLightbox(list, idx)} />
       )}
-      {sec.type === 'table' && sec.tableData?.rows?.length > 0 && <TableBlock sec={sec} />}
+      {sec.type === 'table' && sec.tableData?.rows?.length > 0 && <TableBlock sec={sec} onOpenLightbox={(td) => onOpenLightbox(td, 'table')} />}
       {sec.type === 'file' && (sec.files || []).length > 0 && <FileBlock sec={sec} />}
       {sec.type === 'chart' && (sec.chartData || []).length > 0 && <ChartBlock sec={sec} />}
     </>
@@ -557,7 +611,13 @@ function ProjectDetail() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 900);
   const sectionRefs = useRef({});
 
-  const openLightbox = (list, idx) => setLightbox({ open: true, list, index: idx });
+  const openLightbox = (listOrData, idxOrType) => {
+    if (idxOrType === 'table') {
+      setLightbox({ open: true, type: 'table', tableContent: listOrData, list: [], index: 0 });
+    } else {
+      setLightbox({ open: true, type: 'image', list: listOrData, index: idxOrType || 0 });
+    }
+  };
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 900);
@@ -623,15 +683,21 @@ function ProjectDetail() {
         }
         .pd-layout {
           display: grid;
-          grid-template-columns: 1fr 260px;
+          grid-template-columns: minmax(0, 1fr) 260px;
           gap: 2.5rem;
           align-items: start;
+        }
+        /* Cột trái không được phình vượt không gian */
+        .pd-layout > div:first-child {
+          min-width: 0;
+          overflow: hidden;
         }
         .pd-sidebar {
           position: sticky;
           top: 80px;
           max-height: calc(100vh - 100px);
           overflow-y: auto;
+          min-width: 0;
         }
         .pd-sticky-header {
           position: sticky;
@@ -655,6 +721,7 @@ function ProjectDetail() {
         .rich-content strong { color: #1e293b; }
         .rich-content a { color: #2563eb; }
         .rich-content table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+        .rich-content div[style*='overflow'] { max-width: 100%; }
         .rich-content table td, .rich-content table th { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; }
         .rich-content table th { background: #f1f5f9; font-weight: 700; }
         .rich-content figure { margin: 1rem 0; }
@@ -667,6 +734,9 @@ function ProjectDetail() {
           scroll-margin-top: 90px;
           padding: 2rem 0;
           border-bottom: 1px solid #f1f5f9;
+          /* Ngăn table/chart con tràn ra ngoài */
+          min-width: 0;
+          overflow: hidden;
         }
         .section-block:last-child { border-bottom: none; }
         .section-title {
@@ -713,16 +783,20 @@ function ProjectDetail() {
           flex-shrink: 0;
         }
         @media (max-width: 900px) {
-          .pd-layout { grid-template-columns: 1fr; }
+          .pd-layout { grid-template-columns: minmax(0, 1fr); }
           .pd-sidebar { display: none; }
-          .pd-wrap { padding: 1.25rem 1rem 3.5rem; }
+          .pd-wrap { padding: 1.25rem 1rem 3.5rem; overflow: hidden; }
+          .pd-layout > div:first-child { overflow: hidden; }
         }
         @media (max-width: 640px) {
           .pd-wrap { padding: 1rem 0.75rem 3rem; }
           .section-title { font-size: 1rem; }
+          .section-block { overflow: hidden; }
+          .child-section { overflow: hidden; margin-left: 0; }
         }
         @media (max-width: 480px) {
-          .pd-wrap { padding: 0.875rem 0.625rem 2.5rem; }
+          .pd-wrap { padding: 0.875rem 0.5rem 2.5rem; }
+          .child-section { padding-left: 0.875rem; }
         }
       `}</style>
 
@@ -814,8 +888,10 @@ function ProjectDetail() {
 
       {lightbox.open && (
         <Lightbox
-          list={lightbox.list}
-          index={lightbox.index}
+          type={lightbox.type || 'image'}
+          list={lightbox.list || []}
+          index={lightbox.index || 0}
+          tableContent={lightbox.tableContent}
           onClose={() => setLightbox(lb => ({ ...lb, open: false }))}
           onPrev={() => setLightbox(lb => ({ ...lb, index: lb.index === 0 ? lb.list.length - 1 : lb.index - 1 }))}
           onNext={() => setLightbox(lb => ({ ...lb, index: (lb.index + 1) % lb.list.length }))}
