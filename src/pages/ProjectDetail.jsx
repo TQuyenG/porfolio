@@ -64,7 +64,7 @@ function Lightbox({ list, index, onClose, onPrev, onNext, type = 'image', tableC
       {type === 'table' && tableContent && (
         <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(95vw, 1100px)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,0.6)' }}>
           <div style={{ padding: '0.875rem 1.25rem', backgroundColor: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>📊 {tableContent.title || 'Bảng dữ liệu'}</span>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}> {tableContent.title || 'Bảng dữ liệu'}</span>
             <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{tableContent.rows?.length || 0} hàng · {tableContent.headers?.length || 0} cột</span>
           </div>
           <div style={{ overflowY: 'auto', overflowX: 'auto', flex: 1, backgroundColor: '#fff' }}>
