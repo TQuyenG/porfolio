@@ -8,19 +8,24 @@ import {
 } from 'react-icons/fi';
 
 /* ═══════════════════════════════════════════════════
-   BUILD SECTION TREE (fix lỗi mục con dồn xuống cuối)
-   Flat array → tree đúng thứ tự: mỗi root kèm children
+   BUILD SECTION TREE — đệ quy không giới hạn depth
+   Flat array → tree giữ đúng thứ tự, mỗi node kèm children
 ═══════════════════════════════════════════════════ */
 function buildSectionTree(flat = []) {
-  // Tách root và children
-  const roots = flat.filter(s => !s.parentId);
+  // Xây childMap: parentId → [children theo thứ tự]
   const childMap = {};
-  flat.filter(s => s.parentId).forEach(s => {
-    if (!childMap[s.parentId]) childMap[s.parentId] = [];
-    childMap[s.parentId].push(s);
+  flat.forEach(s => {
+    const pid = s.parentId || null;
+    if (!childMap[pid]) childMap[pid] = [];
+    childMap[pid].push(s);
   });
-  // Gắn children theo đúng vị trí của root
-  return roots.map(r => ({ ...r, children: childMap[r.id] || [] }));
+  // Đệ quy gắn children vào từng node
+  const attachChildren = (nodes) =>
+    (nodes || []).map(n => ({
+      ...n,
+      children: attachChildren(childMap[n.id] || []),
+    }));
+  return attachChildren(childMap[null] || []);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -495,6 +500,54 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
     return '';
   };
 
+  // State lưu id nào đang collapsed (Set)
+  const [collapsed, setCollapsed] = React.useState(new Set());
+  const toggle = (id) => setCollapsed(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  // Đệ quy render TOC item với collapse/expand
+  const renderTocItems = (nodes, depth = 0) =>
+    nodes.filter(s => s.showInToc !== false).map((sec, idx) => {
+      const isActive = activeId === sec.id;
+      const hasKids = (sec.children || []).filter(c => c.showInToc !== false).length > 0;
+      const isCollapsed = collapsed.has(sec.id);
+      const indent = `${0.875 + depth * 0.875}rem`;
+      const fs = depth === 0 ? '0.85rem' : depth === 1 ? '0.8rem' : '0.76rem';
+      const fw = isActive ? 700 : depth === 0 ? 500 : 400;
+      const prefix = depth === 0 ? getLabel(idx) : '';
+      return (
+        <div key={sec.id}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button onClick={() => onClickSection(sec.id)}
+              style={{ flex: 1, minWidth: 0, textAlign: 'left', background: isActive ? '#eff6ff' : 'none', border: 'none', borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent', padding: `0.45rem ${hasKids ? '0.25rem' : '0.875rem'} 0.45rem ${indent}`, color: isActive ? '#2563eb' : depth === 0 ? '#4b5563' : '#6b7280', fontSize: fs, fontWeight: fw, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}
+              onMouseOver={e => { if (!isActive) { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.color = '#1e293b'; } }}
+              onMouseOut={e => { if (!isActive) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = depth === 0 ? '#4b5563' : '#6b7280'; } }}>
+              {prefix && <span style={{ color: '#6366f1', fontWeight: 800, minWidth: '22px', flexShrink: 0 }}>{prefix}</span>}
+              {depth > 0 && <span style={{ color: '#cbd5e1', flexShrink: 0, fontSize: '0.7rem' }}>└</span>}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.title}</span>
+            </button>
+            {hasKids && (
+              <button onClick={() => toggle(sec.id)}
+                title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                style={{ flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', padding: '0.45rem 0.625rem', color: '#94a3b8', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+                onMouseOver={e => e.currentTarget.style.color = '#2563eb'}
+                onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}>
+                <FiChevronRight size={12} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s' }} />
+              </button>
+            )}
+          </div>
+          {hasKids && !isCollapsed && (
+            <div style={{ overflow: 'hidden' }}>
+              {renderTocItems(sec.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {demoUrl && (
@@ -508,28 +561,11 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
 
       {visibleRoots.length > 0 && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FiList size={14} color="#94a3b8" />
+          <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #f1f5f9' }}>
             <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Mục lục</span>
           </div>
           <div style={{ padding: '0.5rem 0' }}>
-            {visibleRoots.map((sec, idx) => (
-              <div key={sec.id}>
-                <button onClick={() => onClickSection(sec.id)}
-                  style={{ width: '100%', textAlign: 'left', background: activeId === sec.id ? '#eff6ff' : 'none', border: 'none', borderLeft: activeId === sec.id ? '3px solid #2563eb' : '3px solid transparent', padding: '0.55rem 1.125rem', color: activeId === sec.id ? '#2563eb' : '#4b5563', fontSize: '0.85rem', fontWeight: activeId === sec.id ? 700 : 500, cursor: 'pointer', transition: 'all 0.15s', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}
-                  onMouseOver={e => { if (activeId !== sec.id) { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.color = '#1e293b'; } }}
-                  onMouseOut={e => { if (activeId !== sec.id) { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4b5563'; } }}>
-                  {getLabel(idx) && <span style={{ color: '#6366f1', fontWeight: 800, minWidth: '24px', flexShrink: 0 }}>{getLabel(idx)}</span>}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.title}</span>
-                </button>
-                {(sec.children || []).filter(c => c.showInToc !== false).map(child => (
-                  <button key={child.id} onClick={() => onClickSection(child.id)}
-                    style={{ width: '100%', textAlign: 'left', background: activeId === child.id ? '#eff6ff' : 'none', border: 'none', borderLeft: activeId === child.id ? '3px solid #93c5fd' : '3px solid transparent', padding: '0.45rem 1.125rem 0.45rem 2rem', color: activeId === child.id ? '#2563eb' : '#6b7280', fontSize: '0.8rem', fontWeight: activeId === child.id ? 700 : 500, cursor: 'pointer', transition: 'all 0.15s', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    └ {child.title}
-                  </button>
-                ))}
-              </div>
-            ))}
+            {renderTocItems(visibleRoots)}
           </div>
         </div>
       )}
@@ -544,13 +580,46 @@ function MobileTocDrawer({ tree, activeId, onClickSection, demoUrl, showToc }) {
   const [open, setOpen] = useState(false);
   const visibleRoots = tree.filter(s => s.showInToc !== false);
 
+  const [mCollapsed, setMCollapsed] = React.useState(new Set());
+  const mToggle = (id) => setMCollapsed(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const renderItems = (nodes, depth = 0) =>
+    nodes.filter(s => s.showInToc !== false).map(sec => {
+      const isActive = activeId === sec.id;
+      const indent = `${1 + depth * 1}rem`;
+      const hasKids = (sec.children || []).filter(c => c.showInToc !== false).length > 0;
+      const isCollapsed = mCollapsed.has(sec.id);
+      return (
+        <div key={sec.id}>
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f8fafc' }}>
+            <button onClick={() => { onClickSection(sec.id); setOpen(false); }}
+              style={{ flex: 1, minWidth: 0, textAlign: 'left', background: isActive ? '#eff6ff' : 'none', border: 'none', padding: `0.65rem ${hasKids ? '0.25rem' : '1rem'} 0.65rem ${indent}`, color: isActive ? '#2563eb' : depth === 0 ? '#374151' : '#64748b', fontSize: depth === 0 ? '0.875rem' : '0.82rem', fontWeight: isActive ? 700 : depth === 0 ? 500 : 400, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {depth > 0 && <span style={{ color: '#cbd5e1', fontSize: '0.7rem' }}>└</span>}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.title}</span>
+            </button>
+            {hasKids && (
+              <button onClick={() => mToggle(sec.id)}
+                style={{ flexShrink: 0, border: 'none', background: 'none', cursor: 'pointer', padding: '0.65rem 0.75rem', color: '#94a3b8', display: 'flex', alignItems: 'center' }}>
+                <FiChevronRight size={12} style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.2s' }} />
+              </button>
+            )}
+          </div>
+          {hasKids && !isCollapsed && renderItems(sec.children, depth + 1)}
+        </div>
+      );
+    });
+
   return (
     <>
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {showToc !== false && visibleRoots.length > 0 && (
           <button onClick={() => setOpen(v => !v)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>
-            <FiList size={14} /> Mục lục {open ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+            Mục lục {open ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
           </button>
         )}
         {demoUrl && (
@@ -562,20 +631,7 @@ function MobileTocDrawer({ tree, activeId, onClickSection, demoUrl, showToc }) {
       </div>
       {open && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '1.5rem', overflow: 'hidden' }}>
-          {visibleRoots.map(sec => (
-            <div key={sec.id}>
-              <button onClick={() => { onClickSection(sec.id); setOpen(false); }}
-                style={{ width: '100%', textAlign: 'left', background: activeId === sec.id ? '#eff6ff' : 'none', border: 'none', borderBottom: '1px solid #f8fafc', padding: '0.7rem 1rem', color: activeId === sec.id ? '#2563eb' : '#374151', fontSize: '0.875rem', fontWeight: activeId === sec.id ? 700 : 500, cursor: 'pointer' }}>
-                {sec.title}
-              </button>
-              {(sec.children || []).filter(c => c.showInToc !== false).map(child => (
-                <button key={child.id} onClick={() => { onClickSection(child.id); setOpen(false); }}
-                  style={{ width: '100%', textAlign: 'left', background: activeId === child.id ? '#eff6ff' : 'none', border: 'none', borderBottom: '1px solid #f8fafc', padding: '0.6rem 1rem 0.6rem 2rem', color: activeId === child.id ? '#2563eb' : '#64748b', fontSize: '0.82rem', fontWeight: activeId === child.id ? 700 : 400, cursor: 'pointer' }}>
-                  └ {child.title}
-                </button>
-              ))}
-            </div>
-          ))}
+          {renderItems(visibleRoots)}
         </div>
       )}
     </>
@@ -583,9 +639,9 @@ function MobileTocDrawer({ tree, activeId, onClickSection, demoUrl, showToc }) {
 }
 
 /* ═══════════════════════════════════════════════════
-   SECTION RENDERER (root hoặc child)
+   SECTION CONTENT — render nội dung 1 section
 ═══════════════════════════════════════════════════ */
-function SectionRenderer({ sec, isChild, onOpenLightbox }) {
+function SectionContent({ sec, onOpenLightbox }) {
   return (
     <>
       {sec.type === 'text' && sec.textContent && <TextBlock sec={sec} />}
@@ -600,8 +656,47 @@ function SectionRenderer({ sec, isChild, onOpenLightbox }) {
 }
 
 /* ═══════════════════════════════════════════════════
-   MAIN
+   NESTED SECTION — đệ quy không giới hạn depth
+   depth=0: root (section-block), depth>=1: child
 ═══════════════════════════════════════════════════ */
+function NestedSection({ sec, depth, sectionRefs, onOpenLightbox, label }) {
+  const isRoot = depth === 0;
+  const indent = Math.min(depth - 1, 3) * 1.125;
+  const hasChildren = (sec.children || []).length > 0;
+
+  if (isRoot) {
+    return (
+      <div id={sec.id} className="section-block"
+        ref={el => { if (sectionRefs) sectionRefs.current[sec.id] = el; }}>
+        <h3 className="section-title">
+          {label && <span style={{ color: 'var(--primary, #2563eb)', marginRight: '0.5rem', fontWeight: 800 }}>{label}</span>}
+          {sec.title}
+        </h3>
+        <SectionContent sec={sec} onOpenLightbox={onOpenLightbox} />
+        {hasChildren && (sec.children || []).map(child => (
+          <NestedSection key={child.id} sec={child} depth={1} sectionRefs={sectionRefs} onOpenLightbox={onOpenLightbox} />
+        ))}
+      </div>
+    );
+  }
+
+  // depth >= 1: mục con
+  const titleSize = depth === 1 ? '1rem' : depth === 2 ? '0.95rem' : '0.9rem';
+
+  return (
+    <div id={sec.id}
+      ref={el => { if (sectionRefs) sectionRefs.current[sec.id] = el; }}
+      style={{ marginTop: '1.5rem', marginLeft: `${indent}rem`, paddingLeft: '1rem', borderLeft: '2px solid #e2e8f0' }}>
+      <h4 style={{ fontSize: titleSize, fontWeight: 700, color: '#1e293b', margin: '0 0 0.875rem', lineHeight: 1.4 }}>
+        {sec.title}
+      </h4>
+      <SectionContent sec={sec} onOpenLightbox={onOpenLightbox} />
+      {hasChildren && (sec.children || []).map(child => (
+        <NestedSection key={child.id} sec={child} depth={depth + 1} sectionRefs={sectionRefs} onOpenLightbox={onOpenLightbox} />
+      ))}
+    </div>
+  );
+}
 function ProjectDetail() {
   const { slug } = useParams();
   const [project, setProject] = useState(null);
@@ -758,11 +853,7 @@ function ProjectDetail() {
           flex-shrink: 0;
         }
         .child-section {
-          margin-top: 1.75rem;
-          padding: 1.25rem 1.25rem 1.25rem 1.5rem;
-          border-left: 3px solid #dbeafe;
-          background: #f8fbff;
-          border-radius: 0 10px 10px 0;
+          /* Không dùng nữa — thay bằng NestedSection inline styles */
         }
         .child-section h4 {
           font-size: 1rem;
@@ -840,30 +931,36 @@ function ProjectDetail() {
               />
             )}
 
-            {/* ── Sections ── */}
+            {/* ── Sections — đệ quy không giới hạn depth ── */}
             <div>
-              {sectionTree.map(sec => (
-                <div key={sec.id} id={sec.id} className="section-block" ref={el => sectionRefs.current[sec.id] = el}>
-                  {/* Section title */}
-                  <h3 className="section-title">{sec.title}</h3>
-
-                  {/* Section content */}
-                  <SectionRenderer sec={sec} isChild={false} onOpenLightbox={openLightbox} />
-
-                  {/* ── Children – đúng thứ tự trong cùng section ── */}
-                  {(sec.children || []).map(child => (
-                    <div key={child.id} id={child.id} className="child-section" ref={el => sectionRefs.current[child.id] = el}>
-                      <h4>{child.title}</h4>
-                      <SectionRenderer sec={child} isChild={true} onOpenLightbox={openLightbox} />
-                    </div>
-                  ))}
-                </div>
-              ))}
+              {sectionTree.map((sec, idx) => {
+                const ns = project.numberingStyle;
+                const pfx = project.customNumberPrefix || '';
+                const n = idx + 1;
+                let lbl = '';
+                if (ns && ns !== 'none') {
+                  if (ns === '1') lbl = `${n}.`;
+                  else if (ns === 'A') lbl = `${String.fromCharCode(64 + n)}.`;
+                  else if (ns === 'a') lbl = `${String.fromCharCode(96 + n)}.`;
+                  else if (ns === 'I') { const r=['I','II','III','IV','V','VI','VII','VIII','IX','X']; lbl = `${r[idx]||n}.`; }
+                  else if (ns === 'i') { const r=['i','ii','iii','iv','v','vi','vii','viii','ix','x']; lbl = `${r[idx]||n}.`; }
+                  else if (ns === 'custom') lbl = `${pfx}${n}`;
+                }
+                return (
+                  <NestedSection
+                    key={sec.id}
+                    sec={sec}
+                    depth={0}
+                    sectionRefs={sectionRefs}
+                    onOpenLightbox={openLightbox}
+                    label={lbl}
+                  />
+                );
+              })}
             </div>
 
             {sectionTree.length === 0 && (
               <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #e2e8f0' }}>
-                <FiLayers size={32} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
                 <p style={{ fontSize: '0.9rem' }}>Chưa có nội dung chi tiết cho dự án này.</p>
               </div>
             )}
