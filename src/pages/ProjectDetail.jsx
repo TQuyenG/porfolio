@@ -918,8 +918,13 @@ function ProjectDetail() {
 
             {/* Description */}
             {project.description && (
-              <div className="rich-content" style={{ color: '#475569', fontSize: '0.975rem', lineHeight: '1.8', marginBottom: '2rem', padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderRadius: '12px', borderLeft: '4px solid #2563eb' }}
-                dangerouslySetInnerHTML={{ __html: project.description }} />
+              <div style={{ marginBottom: '2rem', borderRadius: '14px', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+                <div style={{ padding: '0.6rem 1.25rem', background: 'var(--primary, #2563eb)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Tóm tắt dự án</span>
+                </div>
+                <div className="rich-content" style={{ color: '#374151', fontSize: '0.975rem', lineHeight: '1.85', padding: '1.25rem 1.5rem' }}
+                  dangerouslySetInnerHTML={{ __html: project.description }} />
+              </div>
             )}
 
             {/* Mobile TOC */}
