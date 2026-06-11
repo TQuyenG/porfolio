@@ -479,12 +479,13 @@ function ChartBlock({ sec }) {
    TOC SIDEBAR
 ═══════════════════════════════════════════════════ */
 function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, customNumberPrefix, showToc }) {
-  if (showToc === false) return demoUrl ? (
-    <a href={demoUrl} target="_blank" rel="noreferrer"
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#2563eb', color: '#fff', padding: '0.85rem 1rem', borderRadius: '12px', fontWeight: 800, textDecoration: 'none', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
-      <FiExternalLink size={16} /> Xem Demo
-    </a>
-  ) : null;
+  // Hooks phải đứng đầu — trước mọi early return
+  const [collapsed, setCollapsed] = React.useState(new Set());
+  const toggle = (id) => setCollapsed(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const visibleRoots = tree.filter(s => s.showInToc !== false);
 
@@ -500,13 +501,14 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
     return '';
   };
 
+  if (showToc === false) return demoUrl ? (
+    <a href={demoUrl} target="_blank" rel="noreferrer"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#2563eb', color: '#fff', padding: '0.85rem 1rem', borderRadius: '12px', fontWeight: 800, textDecoration: 'none', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
+      <FiExternalLink size={16} /> Xem Demo
+    </a>
+  ) : null;
+
   // State lưu id nào đang collapsed (Set)
-  const [collapsed, setCollapsed] = React.useState(new Set());
-  const toggle = (id) => setCollapsed(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
 
   // Đệ quy render TOC item với collapse/expand
   const renderTocItems = (nodes, depth = 0) =>
