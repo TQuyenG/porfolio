@@ -4,7 +4,7 @@ import { getPageContent } from '../utils/supabaseClient';
 import {
   FiArrowLeft, FiClock, FiLayers, FiPaperclip, FiDownload,
   FiMaximize2, FiX, FiChevronLeft, FiChevronRight, FiExternalLink,
-  FiUsers, FiTrendingUp, FiTag, FiList, FiChevronDown, FiChevronUp,
+  FiUsers, FiTrendingUp, FiTag, FiList, FiChevronDown, FiChevronUp, FiFileText,
 } from 'react-icons/fi';
 
 /* ═══════════════════════════════════════════════════
@@ -476,9 +476,277 @@ function ChartBlock({ sec }) {
 }
 
 /* ═══════════════════════════════════════════════════
+   EXPORT BUTTON — 3 click + giữ 5s mới mở
+═══════════════════════════════════════════════════ */
+function ExportButton({ project, sectionTree }) {
+  const [clicks, setClicks] = React.useState(0);
+  const [holding, setHolding] = React.useState(false);  // đang giữ sau click 3
+  const [holdProgress, setHoldProgress] = React.useState(0); // 0-100
+  const [open, setOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState('');
+  const clickTimerRef = React.useRef(null);
+  const holdTimerRef = React.useRef(null);
+  const progressRef = React.useRef(null);
+  const ref = React.useRef(null);
+
+  // Đóng khi click ngoài
+  React.useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handleClick = () => {
+    if (holding || open) return;
+    const next = clicks + 1;
+    clearTimeout(clickTimerRef.current);
+    if (next >= 3) {
+      // Bắt đầu chế độ giữ 5 giây
+      setClicks(0);
+      setHolding(true);
+      setHoldProgress(0);
+      let elapsed = 0;
+      const interval = 50; // ms
+      const total = 5000;
+      progressRef.current = setInterval(() => {
+        elapsed += interval;
+        const pct = Math.min((elapsed / total) * 100, 100);
+        setHoldProgress(pct);
+        if (elapsed >= total) {
+          clearInterval(progressRef.current);
+          setHolding(false);
+          setHoldProgress(0);
+          setOpen(true);
+        }
+      }, interval);
+    } else {
+      setClicks(next);
+      clickTimerRef.current = setTimeout(() => setClicks(0), 1800);
+    }
+  };
+
+  const cancelHold = () => {
+    if (holding) {
+      clearInterval(progressRef.current);
+      setHolding(false);
+      setHoldProgress(0);
+      setClicks(0);
+    }
+  };
+
+  /* ── Fetch ảnh về base64 ── */
+  const fetchImgBase64 = async (url) => {
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      return await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+    } catch { return url; }
+  };
+
+  /* ── Thu thập tất cả URL ảnh từ tree ── */
+  const collectAllImages = (nodes) => {
+    const urls = [];
+    const walk = (n) => {
+      if (n.type === 'image' && n.images?.length) urls.push(...n.images);
+      (n.children || []).forEach(walk);
+    };
+    nodes.forEach(walk);
+    return [...new Set(urls)];
+  };
+
+  /* ── Build HTML nội dung để xuất ── */
+  const buildExportHTML = async () => {
+    const allUrls = collectAllImages(sectionTree);
+    const b64Map = {};
+    await Promise.all(allUrls.map(async url => { b64Map[url] = await fetchImgBase64(url); }));
+
+    const ns = project.numberingStyle;
+    const pfx = project.customNumberPrefix || '';
+    const getLabel = (i) => {
+      const n = i + 1;
+      if (!ns || ns === 'none') return '';
+      if (ns === '1') return `${n}. `;
+      if (ns === 'A') return `${String.fromCharCode(64+n)}. `;
+      if (ns === 'a') return `${String.fromCharCode(96+n)}. `;
+      if (ns === 'I') { const r=['I','II','III','IV','V','VI','VII','VIII','IX','X']; return `${r[i]||n}. `; }
+      if (ns === 'i') { const r=['i','ii','iii','iv','v','vi','vii','viii','ix','x']; return `${r[i]||n}. `; }
+      if (ns === 'custom') return `${pfx}${n} `;
+      return '';
+    };
+
+    const renderSec = (sec, depth, idx) => {
+      const tag = depth === 0 ? 'h2' : depth === 1 ? 'h3' : 'h4';
+      const lbl = depth === 0 ? getLabel(idx) : '';
+      let html = `<${tag}>${lbl}${sec.title}</${tag}>`;
+      if (sec.type === 'text' && sec.textContent) html += sec.textContent;
+      if (sec.type === 'table' && sec.tableData?.rows?.length) {
+        const { headers=[], rows=[], showHeader=true, cellStyles={} } = sec.tableData;
+        html += '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">';
+        if (showHeader && headers.some(h => h && !h.match(/^Cột\s*\d+$/)))
+          html += '<thead><tr>' + headers.map(h => `<th style="background:#f1f5f9;font-weight:bold">${h}</th>`).join('') + '</tr></thead>';
+        html += '<tbody>' + rows.map((row, ri) =>
+          '<tr>' + row.map((cell, ci) => {
+            const cs = cellStyles[`${ri}_${ci}`] || {};
+            const s = [cs.bold?'font-weight:bold':'',cs.italic?'font-style:italic':'',cs.color?`color:${cs.color}`:'',cs.bg?`background:${cs.bg}`:''].filter(Boolean).join(';');
+            return `<td style="${s}">${cell||''}</td>`;
+          }).join('') + '</tr>'
+        ).join('') + '</tbody></table>';
+      }
+      if (sec.type === 'image' && sec.images?.length)
+        html += sec.images.map(url => `<img src="${b64Map[url]||url}" style="max-width:100%;margin:8px 0;display:block;"/>`).join('');
+      if (sec.analysisText) html += sec.analysisText;
+      (sec.children||[]).forEach((child,ci) => { html += renderSec(child, depth+1, ci); });
+      return html;
+    };
+
+    const CSS = `
+      body{font-family:Arial,sans-serif;font-size:13px;line-height:1.7;color:#1e293b;max-width:860px;margin:0 auto;padding:32px}
+      h1{font-size:22px;font-weight:bold;margin:0 0 6px}
+      h2{font-size:16px;font-weight:bold;border-bottom:2px solid #1e293b;padding-bottom:4px;margin:28px 0 10px;page-break-after:avoid}
+      h3{font-size:14px;font-weight:bold;color:#1d4ed8;margin:18px 0 8px;page-break-after:avoid}
+      h4{font-size:13px;font-weight:bold;margin:12px 0 6px;page-break-after:avoid}
+      p{margin:0 0 8px} ul,ol{margin:4px 0;padding-left:20px} li{margin-bottom:3px}
+      table{border-collapse:collapse;width:100%;margin:10px 0;font-size:11px;page-break-inside:avoid}
+      td,th{border:1px solid #cbd5e1;padding:5px 8px;vertical-align:top}
+      th{background:#f1f5f9;font-weight:bold}
+      img{max-width:100%;display:block;margin:8px 0;page-break-inside:avoid}
+      .desc{font-style:italic;color:#475569;padding:10px 0 14px;border-top:2px solid #1e293b}
+      @media print{
+        body{padding:0;max-width:100%}
+        h2,h3,h4{page-break-after:avoid}
+        table,img{page-break-inside:avoid}
+      }`;
+
+    const body = `
+      <h1>${project.title || 'Dự án'}</h1>
+      ${project.description ? `<div class="desc">${project.description}</div>` : ''}
+      ${sectionTree.map((sec,i) => renderSec(sec,0,i)).join('')}`;
+
+    return { body, CSS };
+  };
+
+  /* ── Xuất PDF — mở cửa sổ in browser ── */
+  const exportPDF = async () => {
+    setLoading('pdf'); setOpen(false);
+    try {
+      const { body, CSS } = await buildExportHTML();
+      const win = window.open('', '_blank', 'width=900,height=700');
+      win.document.write(`<!DOCTYPE html><html><head>
+        <meta charset="utf-8">
+        <title>${project.title || 'Du an'}</title>
+        <style>${CSS}
+          /* Ẩn nút khi in */
+          .print-btn{display:flex;gap:10px;margin-bottom:20px;padding:12px 0;border-bottom:1px solid #e2e8f0}
+          @media print{.print-btn{display:none!important}}
+        </style>
+      </head><body>
+        <div class="print-btn">
+          <button onclick="window.print()" style="padding:8px 20px;background:#1e293b;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">🖨 In / Lưu PDF</button>
+          <button onclick="window.close()" style="padding:8px 16px;background:#f1f5f9;color:#374151;border:none;border-radius:6px;font-size:13px;cursor:pointer">✕ Đóng</button>
+          <span style="font-size:12px;color:#94a3b8;align-self:center">Chọn "Save as PDF" trong hộp thoại in</span>
+        </div>
+        ${body}
+      </body></html>`);
+      win.document.close();
+    } catch(e) { alert('Lỗi: ' + e.message); }
+    setLoading('');
+  };
+
+  /* ── Xuất Word — MSWord HTML với ảnh base64 ── */
+  const exportWord = async () => {
+    setLoading('word'); setOpen(false);
+    try {
+      const { body, CSS } = await buildExportHTML();
+      const wordHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
+        xmlns:w='urn:schemas-microsoft-com:office:word'
+        xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'>
+        <meta name=ProgId content=Word.Document>
+        <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+        <style>
+          @page{margin:2cm;size:A4}
+          body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000}
+          h1{font-size:18pt;font-weight:bold;margin-bottom:6pt}
+          h2{font-size:14pt;font-weight:bold;border-bottom:2px solid #000;padding-bottom:3pt;margin-top:20pt}
+          h3{font-size:12pt;font-weight:bold;color:#1d4ed8;margin-top:14pt}
+          h4{font-size:11pt;font-weight:bold;margin-top:10pt}
+          p{margin:0 0 6pt} ul,ol{margin:3pt 0;padding-left:18pt} li{margin-bottom:2pt}
+          table{border-collapse:collapse;width:100%;margin:8pt 0;font-size:10pt}
+          td,th{border:1px solid #999;padding:4pt 7pt;vertical-align:top}
+          th{background:#f0f0f0;font-weight:bold}
+          img{max-width:100%;display:block;margin:6pt 0}
+          .desc{font-style:italic;color:#444;border-top:2px solid #000;padding-top:8pt;margin-bottom:10pt}
+        </style></head>
+        <body>${body}</body></html>`;
+      const blob = new Blob(['\ufeff' + wordHtml], { type: 'application/msword;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${project.title || 'du-an'}.doc`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch(e) { alert('Xuất Word thất bại: ' + e.message); }
+    setLoading('');
+  };
+
+  /* ── Indicator: chấm màu theo số click ── */
+  const dotColor = clicks === 1 ? '#fbbf24' : clicks === 2 ? '#f97316' : 'transparent';
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={handleClick}
+        title={holding ? 'Giữ...' : clicks === 0 ? 'Nhấn 3 lần rồi giữ để xuất' : `Còn ${3-clicks} lần nữa`}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '5px' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Vòng progress khi đang giữ */}
+          {holding && (
+            <svg width="22" height="22" style={{ position: 'absolute', transform: 'rotate(-90deg)' }}>
+              <circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" strokeWidth="2"/>
+              <circle cx="11" cy="11" r="9" fill="none" stroke="#2563eb" strokeWidth="2"
+                strokeDasharray={`${2*Math.PI*9}`}
+                strokeDashoffset={`${2*Math.PI*9*(1-holdProgress/100)}`}
+                style={{ transition: 'stroke-dashoffset 0.05s linear' }}/>
+            </svg>
+          )}
+          <FiDownload size={13} color={holding ? '#2563eb' : '#94a3b8'} />
+          {clicks > 0 && !holding && (
+            <div style={{ position: 'absolute', top: '-3px', right: '-3px', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: dotColor }} />
+          )}
+        </div>
+      </button>
+      {/* Nút hủy khi đang giữ */}
+      {holding && (
+        <button onClick={cancelHold}
+          style={{ position: 'absolute', right: 0, top: '120%', fontSize: '0.7rem', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: '2px 4px' }}>
+          Hủy
+        </button>
+      )}
+      {open && (
+        <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: '6px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 200, minWidth: '150px', overflow: 'hidden' }}>
+          <button onClick={exportPDF} disabled={!!loading}
+            style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.65rem 1rem', fontSize: '0.83rem', fontWeight: 600, color: '#374151', cursor: loading?'wait':'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9' }}
+            onMouseOver={e => e.currentTarget.style.background='#f8fafc'}
+            onMouseOut={e => e.currentTarget.style.background='none'}>
+            <FiFileText size={13} color="#ef4444" />
+            {loading === 'pdf' ? 'Đang xử lý...' : 'Xuất PDF'}
+          </button>
+          <button onClick={exportWord} disabled={!!loading}
+            style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '0.65rem 1rem', fontSize: '0.83rem', fontWeight: 600, color: '#374151', cursor: loading?'wait':'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+            onMouseOver={e => e.currentTarget.style.background='#f8fafc'}
+            onMouseOut={e => e.currentTarget.style.background='none'}>
+            <FiFileText size={13} color="#2563eb" />
+            {loading === 'word' ? 'Đang xử lý...' : 'Xuất Word'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
    TOC SIDEBAR
 ═══════════════════════════════════════════════════ */
-function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, customNumberPrefix, showToc }) {
+function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, customNumberPrefix, showToc, project, sectionTree }) {
   // Hooks phải đứng đầu — trước mọi early return
   const [collapsed, setCollapsed] = React.useState(new Set());
   const toggle = (id) => setCollapsed(prev => {
@@ -563,8 +831,9 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
 
       {visibleRoots.length > 0 && (
         <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ padding: '0.875rem 1.125rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Mục lục</span>
+            <ExportButton project={project} sectionTree={sectionTree} />
           </div>
           <div style={{ padding: '0.5rem 0' }}>
             {renderTocItems(visibleRoots)}
@@ -918,12 +1187,11 @@ function ProjectDetail() {
 
             {/* Description */}
             {project.description && (
-              <div style={{ marginBottom: '2rem', borderRadius: '14px', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-                <div style={{ padding: '0.6rem 1.25rem', background: 'var(--primary, #2563eb)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Tóm tắt dự án</span>
-                </div>
-                <div className="rich-content" style={{ color: '#374151', fontSize: '0.975rem', lineHeight: '1.85', padding: '1.25rem 1.5rem' }}
+              <div style={{ marginBottom: '2.25rem' }}>
+                <div style={{ width: '48px', height: '2px', backgroundColor: '#1e293b', marginBottom: '1rem' }} />
+                <div className="rich-content" style={{ color: '#475569', fontSize: '0.96rem', lineHeight: '1.9', fontStyle: 'italic' }}
                   dangerouslySetInnerHTML={{ __html: project.description }} />
+                <div style={{ height: '2px', backgroundColor: '#1e293b', marginTop: '1.25rem', width: '100%' }} />
               </div>
             )}
 
@@ -984,6 +1252,8 @@ function ProjectDetail() {
                 numberingStyle={project.numberingStyle}
                 customNumberPrefix={project.customNumberPrefix}
                 showToc={project.showToc}
+                project={project}
+                sectionTree={sectionTree}
               />
             </div>
           )}
