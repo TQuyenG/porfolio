@@ -383,23 +383,88 @@ const BlogModal = ({ mode, initialData, categories, onClose, onSave, setNotifica
                 <div>
                   <label style={{ fontWeight:700, fontSize:'0.85rem', color:'#374151', display:'block', marginBottom:'0.5rem' }}>Danh mục</label>
                   <select
-                    value={blog.category || ''}
+                    value={blog.category || 'Chung'}
                     onChange={e => update('category', e.target.value)}
                     style={{ ...inputStyle, cursor:'pointer' }}
                   >
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {(categories && categories.length > 0 ? categories : ['Chung']).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ fontWeight:700, fontSize:'0.85rem', color:'#374151', display:'block', marginBottom:'0.5rem' }}>Ngày đăng</label>
+                  <div style={{ display:'flex', gap:'0.5rem', marginBottom:'0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => update('dateMode', 'auto')}
+                      style={{
+                        flex:1, padding:'0.5rem 0.75rem', borderRadius:8, fontWeight:700, fontSize:'0.8rem',
+                        cursor:'pointer', border:'1.5px solid', borderColor: (blog.dateMode || 'auto') === 'auto' ? '#6366f1' : '#e2e8f0',
+                        background: (blog.dateMode || 'auto') === 'auto' ? '#eef2ff' : '#fff',
+                        color: (blog.dateMode || 'auto') === 'auto' ? '#6366f1' : '#64748b',
+                      }}
+                    >
+                      Tự động (khi lưu)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => update('dateMode', 'manual')}
+                      style={{
+                        flex:1, padding:'0.5rem 0.75rem', borderRadius:8, fontWeight:700, fontSize:'0.8rem',
+                        cursor:'pointer', border:'1.5px solid', borderColor: blog.dateMode === 'manual' ? '#6366f1' : '#e2e8f0',
+                        background: blog.dateMode === 'manual' ? '#eef2ff' : '#fff',
+                        color: blog.dateMode === 'manual' ? '#6366f1' : '#64748b',
+                      }}
+                    >
+                      Tự chỉnh
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={blog.date || ''}
                     onChange={e => update('date', e.target.value)}
                     placeholder="VD: 05/06/2026"
-                    style={inputStyle}
+                    disabled={(blog.dateMode || 'auto') === 'auto'}
+                    style={{ ...inputStyle, opacity: (blog.dateMode || 'auto') === 'auto' ? 0.55 : 1, cursor: (blog.dateMode || 'auto') === 'auto' ? 'not-allowed' : 'text' }}
                     onFocus={e => e.target.style.borderColor='#6366f1'}
                     onBlur={e => e.target.style.borderColor='#e2e8f0'}
+                  />
+                  {(blog.dateMode || 'auto') === 'auto' && (
+                    <p style={{ fontSize:'0.75rem', color:'#94a3b8', margin:'0.35rem 0 0' }}>Ngày sẽ được tự động cập nhật thành thời điểm lưu bài viết.</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontWeight:700, fontSize:'0.85rem', color:'#374151', display:'block', marginBottom:'0.5rem' }}>
+                  Tags <span style={{ fontWeight:500, color:'#94a3b8' }}>(nhấn Enter để thêm, hỗ trợ nhiều lĩnh vực)</span>
+                </label>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:'0.5rem', padding:'0.6rem', border:'1.5px solid #e2e8f0', borderRadius:10, background:'#fff' }}>
+                  {(blog.tags || []).map((tag, ti) => (
+                    <span key={ti} style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#eef2ff', color:'#6366f1', padding:'0.3rem 0.7rem', borderRadius:99, fontSize:'0.8rem', fontWeight:700 }}>
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => update('tags', (blog.tags || []).filter((_, i) => i !== ti))}
+                        style={{ border:'none', background:'transparent', cursor:'pointer', color:'#6366f1', display:'flex', alignItems:'center', padding:0 }}
+                      >
+                        <FiX size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    placeholder="Nhập tag rồi nhấn Enter..."
+                    style={{ flex:1, minWidth:120, border:'none', outline:'none', fontSize:'0.85rem', fontFamily:"'Plus Jakarta Sans', sans-serif" }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = e.currentTarget.value.trim();
+                        if (val && !(blog.tags || []).includes(val)) {
+                          update('tags', [...(blog.tags || []), val]);
+                        }
+                        e.currentTarget.value = '';
+                      }
+                    }}
                   />
                 </div>
               </div>

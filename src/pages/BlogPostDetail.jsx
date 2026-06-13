@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getPageContent } from '../utils/supabaseClient';
 import {
   FiArrowLeft, FiClock, FiBookOpen, FiShare2,
-  FiArrowRight, FiList, FiX,
+  FiArrowRight, FiList, FiX, FiTag,
 } from 'react-icons/fi';
 
 /* ── Reading time ── */
@@ -57,7 +57,7 @@ export default function BlogPostDetail() {
         if (found) {
           setRelated(
             blogData.posts
-              .filter(p => p.id !== found.id && !p.isHidden && !p.isDraft && p.category === found.category)
+              .filter(p => p.id !== found.id && !p.isHidden && !p.isDraft && (p.category || 'Chung') === (found.category || 'Chung'))
               .slice(0, 3)
           );
         }
@@ -184,6 +184,13 @@ export default function BlogPostDetail() {
           display:inline-flex; padding:0.28rem 0.85rem; border-radius:99px;
           font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.06em;
           background:#eef2ff; color:#6366f1; margin-bottom:1rem;
+        }
+        .bpd-tags { display:flex; gap:0.4rem; flex-wrap:wrap; margin:0.9rem 0 0; }
+        .bpd-tag-pill {
+          display:inline-flex; align-items:center; gap:4px;
+          padding:0.24rem 0.7rem; border-radius:99px;
+          font-size:0.72rem; font-weight:700;
+          background:#f1f5f9; color:#64748b;
         }
         .bpd-title {
           font-family:'Fraunces',serif;
@@ -423,6 +430,13 @@ export default function BlogPostDetail() {
                       <FiShare2 size={13} /> Chia sẻ
                     </button>
                   </div>
+                  {(post.tags || []).length > 0 && (
+                    <div className="bpd-tags">
+                      {post.tags.map((t, i) => (
+                        <span key={i} className="bpd-tag-pill"><FiTag size={11} /> {t}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Rich content */}

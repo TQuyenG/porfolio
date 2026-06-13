@@ -281,14 +281,18 @@ export default function Private() {
 
   const openBlogForm = (mode, index = null) => {
     const cats = formData.categories || ['Chung', 'Nghiệp vụ BA'];
-    if (mode === 'add') setBlogModalConfig({ open: true, mode: 'add', index: null, data: { id: Date.now(), title: '', slug: '', category: cats[0], excerpt: '', content: '', date: new Date().toLocaleDateString('vi-VN'), isHidden: false, isPinned: false, isDraft: false, coverImage: '' } });
+    if (mode === 'add') setBlogModalConfig({ open: true, mode: 'add', index: null, data: { id: Date.now(), title: '', slug: '', category: cats[0] || 'Chung', tags: [], excerpt: '', content: '', date: new Date().toLocaleDateString('vi-VN'), dateMode: 'auto', isHidden: false, isPinned: false, isDraft: false, coverImage: '' } });
     else setBlogModalConfig({ open: true, mode: 'edit', index, data: { ...formData.posts[index] } });
   };
 
   const handleSaveBlogFromModal = (updatedBlogData) => {
     const list = [...(formData.posts || [])];
     updatedBlogData.slug = generateUniqueSlug(updatedBlogData.title, list, updatedBlogData.id);
-    updatedBlogData.date = new Date().toLocaleDateString('vi-VN');
+    updatedBlogData.category = updatedBlogData.category || 'Chung';
+    // Chỉ tự động gán ngày hiện tại khi ở chế độ "Tự động" hoặc bài viết mới chưa có ngày
+    if (updatedBlogData.dateMode !== 'manual' && (blogModalConfig.mode === 'add' || !updatedBlogData.date)) {
+      updatedBlogData.date = new Date().toLocaleDateString('vi-VN');
+    }
     if (blogModalConfig.mode === 'add') setFormData({ ...formData, posts: [updatedBlogData, ...list] });
     else { list[blogModalConfig.index] = updatedBlogData; setFormData({ ...formData, posts: list }); }
     setBlogModalConfig({ ...blogModalConfig, open: false });
