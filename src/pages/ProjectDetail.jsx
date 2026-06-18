@@ -763,8 +763,8 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
     if (numberingStyle === '1') return `${n}.`;
     if (numberingStyle === 'A') return `${String.fromCharCode(64 + n)}.`;
     if (numberingStyle === 'a') return `${String.fromCharCode(96 + n)}.`;
-    if (numberingStyle === 'I') { const r = ['I','II','III','IV','V','VI','VII','VIII','IX','X']; return `${r[idx] || n}.`; }
-    if (numberingStyle === 'i') { const r = ['i','ii','iii','iv','v','vi','vii','viii','ix','x']; return `${r[idx] || n}.`; }
+    if (numberingStyle === 'I') { const r = ['I','II','III','IV','V','VI','VII','VIII','IX','X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII', 'XXVIII', 'XXIX', 'XXX']; return `${r[idx] || n}.`; }
+    if (numberingStyle === 'i') { const r = ['i','ii','iii','iv','v','vi','vii','viii','ix','x', 'xi', 'xii', 'xiii', 'xiv', 'xv', 'xvi', 'xvii', 'xviii', 'xix', 'xx', 'xxi', 'xxii', 'xxiii', 'xxiv', 'xxv', 'xxvi', 'xxvii', 'xxviii', 'xxix', 'xxx']; return `${r[idx] || n}.`; }
     if (numberingStyle === 'custom') return `${customNumberPrefix || ''}${n}`;
     return '';
   };
@@ -825,7 +825,7 @@ function TocSidebar({ tree, activeId, onClickSection, demoUrl, numberingStyle, c
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: '#2563eb', color: '#fff', padding: '0.85rem 1rem', borderRadius: '12px', fontWeight: 800, textDecoration: 'none', fontSize: '0.9rem', boxShadow: '0 4px 14px rgba(37,99,235,0.3)', transition: 'transform 0.2s, box-shadow 0.2s' }}
           onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(37,99,235,0.35)'; }}
           onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(37,99,235,0.3)'; }}>
-          <FiExternalLink size={16} /> Xem Demo
+          <FiExternalLink size={16} /> Xem Demo / Link Github
         </a>
       )}
 
@@ -896,7 +896,7 @@ function MobileTocDrawer({ tree, activeId, onClickSection, demoUrl, showToc }) {
         {demoUrl && (
           <a href={demoUrl} target="_blank" rel="noreferrer"
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0.6rem 1rem', backgroundColor: '#2563eb', color: '#fff', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none' }}>
-            <FiExternalLink size={14} /> Xem Demo
+            <FiExternalLink size={14} /> Xem Demo / Link Github
           </a>
         )}
       </div>
